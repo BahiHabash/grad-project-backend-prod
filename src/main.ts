@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { Logger } from 'nestjs-pino';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 /**
  * The main entry point of the application.
@@ -24,8 +24,17 @@ async function bootstrap() {
       ? { origin: configService.get<string>('CORS_ORIGIN') }
       : true;
 
+  app.setGlobalPrefix('api');
+
+  // --- Configure Swagger (OpenAPI) Documentation ---
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Shalaboka_AI API')
+    .setVersion('1.0')
+    .build();
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, document); // api/docs
+
   // --- Apply Middlewares & Setups ---
-  app.useLogger(app.get(Logger));
   app.use(helmet());
   app.enableCors(corsOptions);
 

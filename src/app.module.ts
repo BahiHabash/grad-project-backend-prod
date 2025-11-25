@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { ClassSerializerInterceptor, Module } from '@nestjs/common';
 import { CoreModule } from './core/core.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -9,8 +9,8 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { InvitationModule } from './modules/invitation/invitation.module';
 import { ApplicationModule } from './modules/application/application.module';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
-import { GlobalExceptionFilter } from './core/filters/global-exception.filter';
-import { TransformInterceptor } from './core/interceptor/transform.interceptor';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { TransformInterceptor } from './common/interceptor/transform.interceptor';
 
 /**
  * The root module of the application and the starting point.
@@ -39,6 +39,11 @@ import { TransformInterceptor } from './core/interceptor/transform.interceptor';
       // Registers the TransformInterceptor globally
       provide: APP_INTERCEPTOR,
       useClass: TransformInterceptor,
+    },
+    {
+      // Registers the TransformInterceptor globally
+      provide: APP_INTERCEPTOR,
+      useClass: ClassSerializerInterceptor,
     },
   ],
 })

@@ -3,42 +3,63 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
 import { Request, Response } from 'express';
 
-/**
- * Provides and configures the application-wide logger using `nestjs-pino`.
- */
 @Module({
   imports: [
     PinoLoggerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const logLevel =
-          configService.get<string>('NODE_ENV') === 'production'
-            ? 'info'
-            : 'debug';
+      useFactory: (config: ConfigService) => {
+        const isDev = config.get('NODE_ENV') !== 'production';
 
         return {
           pinoHttp: {
-            level: logLevel,
+            level: 'debug',
+
+            // Request ID for tracing
+            genReqId: (req) =>
+              req.headers['x-request-id']?.toString() ??
+              `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+
             serializers: {
               req: (req: Request) => ({
                 id: req.id,
-                method: req.method,
-                url: req.url,
-                headers: {
-                  'user-agent': req.headers['user-agent'],
-                },
+                url: `${req.method} ${req.url}`,
+                query: req.query.length ? req.query : undefined,
+                userAgent: req.headers['user-agent'],
               }),
               res: (res: Response) => ({
                 statusCode: res.statusCode,
               }),
             },
-            transport: {
-              target: 'pino-pretty',
-              options: {
-                colorize: true,
-              },
-            },
+
+            transport: isDev
+              ? {
+                  targets: [
+                    {
+                      target: 'pino-pretty',
+                      options: {
+                        destination: './logs/dev.log',
+                        mkdir: true,
+                        colorize: false,
+                        translateTime: 'yyyy-mm-dd HH:MM:ss.l',
+                        ignore: 'pid,hostname',
+                      },
+                    },
+
+                    {
+                      level: 'error',
+                      target: 'pino-pretty',
+                      options: {
+                        destination: './logs/error.log',
+                        mkdir: true,
+                        colorize: false,
+                        translateTime: 'yyyy-mm-dd HH:MM:ss.l',
+                        ignore: 'pid,hostname',
+                      },
+                    },
+                  ],
+                }
+              : undefined,
           },
         };
       },

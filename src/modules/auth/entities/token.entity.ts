@@ -17,7 +17,7 @@ export class Token {
 
   @Index()
   @Column({ type: 'varchar', length: 250, nullable: false })
-  token: string;
+  token_hash: string;
 
   @Column({ type: 'enum', enum: TokenType, nullable: false })
   type: TokenType;

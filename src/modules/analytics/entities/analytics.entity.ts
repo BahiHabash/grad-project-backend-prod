@@ -1,5 +1,5 @@
-import { Club } from 'src/modules/club/entities/club.entity';
-import { Member } from '../..//member/entities/member.entity';
+import { Club } from './../../club/entities/club.entity';
+import { Member } from '../../member/entities/member.entity';
 import { Team } from '../../team/entities/team.entity';
 import {
   Entity,

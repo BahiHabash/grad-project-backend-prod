@@ -21,7 +21,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { ResponseMessage } from 'src/common/decorators/response-message.decorator';
+import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { LoginReqDto, LoginResDto } from './dtos/login.dto';
 import { ForgotPasswordReqDto } from './dtos/forgot-password.dto';
 import {
@@ -30,12 +30,12 @@ import {
 } from './dtos/reset-password.dto';
 import { RefreshReqDto, RefreshResDto } from './dtos/refresh.dto';
 import { ChangePasswordReqDto } from './dtos/change-password.dto';
-import { ApiSuccessResponse } from 'src/common/decorators/api-response.decorator';
+import { ApiSuccessResponse } from '../../common/decorators/api-response.decorator';
 import { LocalAuthGuard } from './guards/local.guard';
-import { ValidationGuard } from 'src/common/guards/validation.guard';
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { ValidationGuard } from '../../common/guards/validation.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { User } from '../user/entities/user.entity';
-import { Public } from 'src/common/decorators/public-endpoint.decorator';
+import { Public } from '../../common/decorators/public-endpoint.decorator';
 import { VerifyEmailResDto } from './dtos/verify-email.dto';
 import type { AccessTokenPayload } from './constants/token-payload.type';
 

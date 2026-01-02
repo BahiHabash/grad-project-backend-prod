@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   Index,
 } from 'typeorm';
-import { User } from 'src/modules/user/entities/user.entity';
+import { User } from '../../user/entities/user.entity';
 import { TokenType } from '../constants/token-type.enum';
 
 @Entity({ name: 'tokens' })

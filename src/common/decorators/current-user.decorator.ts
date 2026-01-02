@@ -1,6 +1,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
-import type { AccessTokenPayload } from 'src/modules/auth/constants/token-payload.type';
+import type { AccessTokenPayload } from '../../modules/auth/constants/token-payload.type';
 import type { RequestWithUser } from '../interfaces/Request.interface';
 
 export const CurrentUser = createParamDecorator(

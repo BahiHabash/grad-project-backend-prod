@@ -29,7 +29,18 @@ export function setupApp(app: INestApplication) {
   SwaggerModule.setup('docs', app, document); // api/docs
 
   // --- Apply Middlewares & Setups ---
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'validator.swagger.io'],
+        },
+      },
+    }),
+  );
   app.enableCors(corsOptions);
 
   // --- Apply Validators ---

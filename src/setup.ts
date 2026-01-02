@@ -26,7 +26,16 @@ export function setupApp(app: INestApplication) {
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document); // api/docs
+  SwaggerModule.setup('docs', app, document, {
+    customSiteTitle: 'Backend API Docs',
+    // These links bypass the 404 errors by loading assets from the web
+    customCssUrl:
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-standalone-preset.js',
+    ],
+  });
 
   // --- Apply Middlewares & Setups ---
   app.use(

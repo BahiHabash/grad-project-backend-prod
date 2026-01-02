@@ -9,7 +9,8 @@ import { Request, Response } from 'express';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const isDev = config.get('NODE_ENV') !== 'production';
+        const isDev =
+          config.get('NODE_ENV') !== 'production' && !config.get('VERCEL');
 
         return {
           pinoHttp: {

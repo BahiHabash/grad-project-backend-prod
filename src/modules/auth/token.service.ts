@@ -120,6 +120,11 @@ export class TokenService {
    * @returns A Hashed hex string.
    */
   hashToken(token: string): string {
-    return crypto.createHash('sha256').update(token).digest('hex');
+    try {
+      return crypto.createHash('sha256').update(token).digest('hex');
+    } catch (err) {
+      this.logger.error('Error hashing token', err);
+      throw new InternalServerErrorException('Error hashing token');
+    }
   }
 }

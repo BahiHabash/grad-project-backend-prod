@@ -109,3 +109,159 @@ Statuses apply to _users, teams, claims, analytics_, and accounts to manage life
 ### Membership State Machine
 
 - As a `System`, I want atomic transitions (e.g., PENDING_CLAIM to MANAGER) handled via services so that states remain consistent.
+
+---
+
+## **User Scenarios** (key behaviors - Gherkin Format)
+
+scenarios describe key behaviors and edge cases in BDD style (Given-When-Then).
+
+### A. Authentication & Account
+
+**Feature: User Authentication**  
+Scenario: Successful Signup and Login  
+**Given** a new user with valid email and password  
+**When** the user signs up and then logs in  
+**Then** a JWT token is issued, and account_status is ACTIVE.
+
+Scenario: Password Update  
+**Given** an authenticated user  
+**When** the user updates their password  
+**Then** the new password is hashed and saved securely.
+
+### B. Team Formation (The "Claim" Pipeline)
+
+**Feature: Claiming a Club**  
+Scenario: Submit Claim Application  
+**Given** a Normal User with team_role NONE  
+**And** a selected club from the static list  
+**When** the user uploads docs and submits the application  
+Then application status is PENDING, and applicationId is linked to the user.
+
+Scenario: Admin Approves Claim  
+**Given** a PENDING claim application  
+**When** the Admin approves it  
+**Then** a Team is created with status ACTIVE, managerId set, user's team_role becomes MANAGER, teamId updated, and any invites for the user are deleted.
+
+Scenario: Admin Rejects Claim  
+**Given** a PENDING claim application  
+**When** the Admin rejects with feedback  
+**Then** status is REJECTED, admin_feedback is saved, and user's team_role remains NONE.
+
+Scenario: Constraint Violation on Claim  
+**Given** a User with team_role not NONE  
+**When** the user tries to submit a claim  
+**Then** the action is rejected due to 1:1:1 constraint.
+
+### C. Team Governance (Staffing)
+
+**Feature: Inviting and Managing Staff**  
+Scenario: Manager Sends Invite  
+**Given** a Manager and a team-less existing user email  
+**When** the Manager sends an invite  
+**Then** an invitation is created, and it's pending for the invitee.
+
+Scenario: Invitee Accepts Invite  
+**Given** a Normal User with a pending invite  
+**When** the user accepts  
+**Then** team_role becomes STAFF, teamId is set, and all other pending invites are deleted.
+
+Scenario: Manager Kicks Staff  
+**Given** a Staff in a team  
+**When** the Manager kicks them  
+**Then** the Staff's team_role resets to NONE, teamId to NULL.
+
+Scenario: Invite to Non-Teamless User  
+**Given** a user already in a team  
+**When** a Manager tries to invite them  
+**Then** the invite is rejected.
+
+### D. Succession & Liquidation (Exit Logic)
+
+**Feature: Team Exit and Succession**  
+Scenario: Staff Leaves Team  
+**Given** a Staff in a team  
+**When** they leave  
+**Then** team_role becomes NONE, teamId NULL.
+
+Scenario: Manager Succession  
+**Given** a Manager with at least one Staff  
+**When** the Manager appoints a successor and leaves  
+**Then** managerId transfers to successor, roles swap (new MANAGER, old NONE), and old Manager exits.
+
+Scenario: Lone Manager Leaves  
+**Given** a Manager with no Staff  
+**When** they leave  
+**Then** team status becomes SOFT_DELETED, user's team_role NONE.
+
+Scenario: No Succession Without Appointment  
+**Given** a Manager with Staff  
+**When** they try to leave without appointing successor  
+**Then** the action is rejected.
+
+### E. Tactical AI Dashboard
+
+**Feature: Accessing Analytics**  
+Scenario: Fetch Pre-Match Analysis  
+**Given** an active Manager or Staff  
+**When** they request pre-match analytics  
+**Then** the backend queries external server using external_club_id, status becomes READY, and JSON content is displayed if teamId matches.
+
+Scenario: Unauthorized Access  
+**Given** a User not in the team  
+**When** they request analytics for a team  
+**Then** access is denied due to isolation guard.
+
+Scenario: Live In-Match Sync  
+**Given** an active team member during a match  
+**When** in-match analytics are requested  
+**Then** status is RUNNING, and live JSON is fetched and displayed.
+
+### F. User Favorites (New Feature)
+
+**Feature: Managing and Viewing Favorites**  
+Scenario: Add Favorite  
+**Given** any authenticated User  
+**When** they select a league, team, or player to favorite  
+**Then** the favorite is added to their profile, and general stats are available for viewing.
+
+Scenario: View General Stats for Favorite  
+**Given** a User with favorites  
+**When** they request stats for a favorite  
+**Then** general stats data (e.g., from external server) is fetched and displayed.
+
+Scenario: Remove Favorite  
+**Given** a User with favorites  
+**When** they remove one  
+**Then** the favorite is deleted from their profile.
+
+### G. Admin Search Functionality (New Feature)
+
+**Feature: Admin Searching System Entities**  
+Scenario: Search for Users  
+**Given** an Admin  
+**When** they search by email, role, or status  
+**Then** a list of matching users is returned with details.
+
+Scenario: Search for Teams  
+**Given** an Admin  
+**When** they search by name, status, or external_club_id  
+**Then** a list of matching teams is returned.
+
+Scenario: Search for Claims or Invites  
+**Given** an Admin  
+**When** they search by status or ID  
+**Then** relevant claims or invites are listed for review.
+
+### Membership State Machine
+
+**Feature: State Transitions**  
+Scenario: Transition to PENDING_CLAIM  
+**Given** User with team_role NONE  
+**When** claim submitted  
+**Then** state transitions to PENDING_CLAIM atomically.
+
+Scenario: Auto-Expire Invites on Join  
+**Given** a User with pending invites  
+**When** they accept one or become Manager  
+**Then** all other invites are deleted via clean-up job.

@@ -39,7 +39,8 @@ Statuses apply to _users, teams, claims, analytics_, and accounts to manage life
 | ----------- | ---------- | ------------------------------------------------------------ |
 | **EXPIRED** | Invites    | Invite auto-deleted due to expiry or user joining elsewhere. |
 | **PENDING** | Invites    | (invite acceptance pending).                                 |
-
+| **ACCEPTED**| Invites    | Invitation Accepted.                                         |
+| **REJECTED**| Invites    | Invitation Rejected.                                         |
 ---
 
 ### **Analytics:-**

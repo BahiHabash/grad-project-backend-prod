@@ -3,7 +3,7 @@ import { PreMatchResDto } from './dto/prematch-dto';
 import { PinoLogger } from 'nestjs-pino';
 import { validateData } from 'src/utils/data-validation';
 import * as requestedData from '../../../final_json.json';
-import { ApiErrorException } from 'src/utils/exceptions/http-exception';
+import { ApiErrorException } from 'src/utils/exceptions/http-error-exception';
 @Injectable()
 export class PrematchService {
   constructor(private readonly logger: PinoLogger) {}

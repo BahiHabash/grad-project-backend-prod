@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { ApiErrorException } from './exceptions/http-exception';
+import { ApiErrorException } from './exceptions/http-error-exception';
 
 export async function validateData<T>(dto: new () => T, data: any): Promise<T> {
   const instance = plainToInstance(dto, data);

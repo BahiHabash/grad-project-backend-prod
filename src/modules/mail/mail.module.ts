@@ -15,7 +15,7 @@ import { MailListener } from './mail.listener';
         transport: {
           host: mailConfig.host,
           port: mailConfig.port,
-          secure: appConfig.isDevelopment,
+          secure: !appConfig.isDevelopment,
           auth: {
             user: mailConfig.user,
             pass: mailConfig.password,

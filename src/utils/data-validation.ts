@@ -1,7 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { BadGatewayException } from '@nestjs/common';
-import type { ApiErrorResponse } from './interfaces/api-error-response';
+import { ApiErrorException } from './exceptions/http-exception';
 
 export async function validateData<T>(dto: new () => T, data: any): Promise<T> {
   const instance = plainToInstance(dto, data);
@@ -15,12 +14,7 @@ export async function validateData<T>(dto: new () => T, data: any): Promise<T> {
       children: err.children,
     }));
 
-    const errorResponse: ApiErrorResponse = {
-      error: 'External API returned invalid data',
-      message: messages,
-    };
-
-    throw new BadGatewayException(errorResponse);
+    throw new ApiErrorException('External API returned invalid data', messages);
   }
 
   return instance;

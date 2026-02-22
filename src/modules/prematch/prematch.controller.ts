@@ -6,7 +6,6 @@ import { Public } from 'src/common/decorators/public-endpoint.decorator';
 export class PrematchController {
   constructor(private readonly prematchService: PrematchService) {}
 
-  @Public()
   @Get()
   async findAll() {
     return await this.prematchService.preMatchData();

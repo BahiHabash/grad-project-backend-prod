@@ -1,18 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { PreMatchDto } from './dto/prematch-dto';
-import { validate } from 'class-validator';
-import { plainToInstance } from 'class-transformer';
+import { PreMatchResDto } from './dto/prematch-dto';
 import { BadGatewayException } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-
+import { validateData } from 'src/utils/data-validation';
+import * as requestedData from '../../../final_json.json';
 @Injectable()
 export class PrematchService {
   constructor(private readonly logger: PinoLogger) {}
-  async preMatchData() {
-    let requestedData: any;
-
+  /**
+   * Fetches and validates pre-match data from the external API.
+   *
+   * @returns {Promise<PreMatchResDto>} Validated pre-match data including meta,
+   * training plan, team selection, and opponent analysis.
+   * @throws {BadGatewayException} If the external API is unreachable or returns invalid data.
+   */
+  async preMatchData(): Promise<PreMatchResDto> {
     try {
-      requestedData = require('./../../../final_json.json');
     } catch (error) {
       this.logger.error('External API request failed', error?.message);
 
@@ -25,22 +28,7 @@ export class PrematchService {
       throw new BadGatewayException('External API is unreachable');
     }
 
-    const instance = plainToInstance(PreMatchDto, requestedData);
-
-    const errors = await validate(instance);
-
-    if (errors.length > 0) {
-      const messages = errors.map((err) => ({
-        field: err.property,
-        constraints: err.constraints,
-        children: err.children,
-      }));
-
-      throw new BadGatewayException({
-        message: 'External API returned invalid data',
-        errors: messages,
-      });
-    }
+    const instance = await validateData(PreMatchResDto, requestedData);
 
     return instance;
   }

@@ -8,6 +8,7 @@ import {
   IsOptional,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 
 class MetaData {
   @IsInt()
@@ -206,19 +207,35 @@ class OpponentAnalysisDto {
   vulnerabilities: string[];
 }
 
-export class PreMatchDto {
+export class PreMatchResDto {
+  @ApiProperty({
+    description: 'Meta information about the match',
+    type: () => MetaData,
+  })
   @ValidateNested()
   @Type(() => MetaData)
   meta: MetaData;
 
+  @ApiProperty({
+    description: 'Training plan for the match',
+    type: () => TrainingPlanDto,
+  })
   @ValidateNested()
   @Type(() => TrainingPlanDto)
   trainingPlan: TrainingPlanDto;
 
+  @ApiProperty({
+    description: 'Team selection details',
+    type: () => TeamSelectionDto,
+  })
   @ValidateNested()
   @Type(() => TeamSelectionDto)
   teamSelection: TeamSelectionDto;
 
+  @ApiProperty({
+    description: 'Opponent analysis data',
+    type: () => OpponentAnalysisDto,
+  })
   @ValidateNested()
   @Type(() => OpponentAnalysisDto)
   opponentAnalysis: OpponentAnalysisDto;

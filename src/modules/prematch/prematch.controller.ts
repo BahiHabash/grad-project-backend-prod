@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrematchService } from './prematch.service';
 import { PreMatchResDto } from './dto/prematch-dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('pre-match')
 export class PrematchController {

@@ -9,7 +9,9 @@ import { Request, Response } from 'express';
       imports: [ConfigModule],
       inject: [AppConfig],
       useFactory: () => {
-        const isProduction = process.env.NODE_ENV === 'production';
+        const isProduction =
+          process.env.NODE_ENV === 'production' ||
+          process.env.VERCEL_ENV === 'production';
 
         return {
           pinoHttp: {

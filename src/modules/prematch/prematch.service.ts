@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable } from '@nestjs/common';
 import { PreMatchResDto } from './dto/prematch-dto';
 import { PinoLogger } from 'nestjs-pino';
-import { validateData } from 'src/utils/data-validation';
-import * as requestedData from '../../../final_json.json';
-import { ApiErrorException } from 'src/utils/exceptions/http-error-exception';
+import { validateData } from '../../utils/data-validation';
+// import * as requestedData from '../../../final_json.json';
+import { ApiErrorException } from '../../utils/exceptions/http-error-exception';
+
 @Injectable()
 export class PrematchService {
   constructor(private readonly logger: PinoLogger) {}
@@ -15,7 +16,15 @@ export class PrematchService {
    * @throws {ApiErrorException} If the external API is unreachable or returns invalid data.
    */
   async preMatchData(): Promise<PreMatchResDto> {
+    const requestedData = null; // Simulate API failure by setting data to null
+
     try {
+      this.logger.info('Fetching pre-match data from external API...');
+      this.logger.warn('Feature Not Working - Waiting The AI Model API...');
+
+      throw new BadGatewayException(
+        'Simulated API failure Failed to fetch data from external API',
+      );
     } catch (error) {
       this.logger.error('External API request failed', error?.message);
 

@@ -11,11 +11,11 @@ import { MailListener } from './mail.listener';
   imports: [
     MailerModule.forRootAsync({
       inject: [MailConfig, AppConfig],
-      useFactory: (mailConfig: MailConfig, appConfig: AppConfig) => ({
+      useFactory: (mailConfig: MailConfig) => ({
         transport: {
           host: mailConfig.host,
           port: mailConfig.port,
-          secure: appConfig.isDevelopment,
+          secure: mailConfig.port === 465,
           auth: {
             user: mailConfig.user,
             pass: mailConfig.password,

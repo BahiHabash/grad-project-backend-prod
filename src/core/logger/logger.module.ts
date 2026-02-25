@@ -8,7 +8,9 @@ import { Request, Response } from 'express';
     PinoLoggerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [AppConfig],
-      useFactory: (appConfig: AppConfig) => {
+      useFactory: () => {
+        const isProduction = process.env.NODE_ENV === 'production';
+
         return {
           pinoHttp: {
             level: 'debug',
@@ -30,7 +32,7 @@ import { Request, Response } from 'express';
               }),
             },
 
-            transport: appConfig.isDevelopment
+            transport: !isProduction
               ? {
                   targets: [
                     {

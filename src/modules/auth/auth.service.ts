@@ -23,6 +23,11 @@ import { UserService } from '../user/user.service';
 import { AccountStatus } from '../user/constants/account-status.enum';
 import type { AuthTokens } from './constants/auth-tokens.type';
 
+type verificationTokens = {
+  url: string;
+  token: string;
+};
+
 @Injectable()
 export class AuthService {
   /**
@@ -56,7 +61,9 @@ export class AuthService {
    * @throws {ConflictException} If a user with the same email or username already exists.
    * @returns {Promise<void>} A promise that resolves when the sign-up process is complete.
    */
-  async signUp(signUpDto: SignUpReqDto): Promise<AuthTokens> {
+  async signUp(
+    signUpDto: SignUpReqDto,
+  ): Promise<AuthTokens & verificationTokens> {
     this.logger.info('Attempting Sign Up:', {
       email: signUpDto.email,
     });
@@ -87,7 +94,7 @@ export class AuthService {
     await this.userRepo.save(newUser);
 
     // generate email verification token and send it
-    await this.handleUserEmailVerification(newUser);
+    const { token, url } = await this.handleUserEmailVerification(newUser);
 
     // generate access and refresh tokens
     const accessToken = this.tokenService.createAccessToken(
@@ -95,7 +102,12 @@ export class AuthService {
     );
     const refreshToken = await this.tokenService.createRefreshToken(newUser.id);
 
-    return { accessToken, refreshToken };
+    return {
+      accessToken,
+      refreshToken,
+      url: url,
+      token: token,
+    };
   }
 
   /**
@@ -208,7 +220,7 @@ export class AuthService {
    * @param id - The user's ID.
    * @throws {BadRequestException} If the user is invalid or already verified.
    */
-  async requestEmailVerification(id: string): Promise<void> {
+  async requestEmailVerification(id: string): Promise<verificationTokens> {
     const user: User | null = await this.userRepo.findOneBy({ id });
 
     if (!user) {
@@ -219,7 +231,7 @@ export class AuthService {
       throw new BadRequestException('User is already verified.');
     }
 
-    await this.handleUserEmailVerification(user);
+    return await this.handleUserEmailVerification(user);
   }
 
   /**
@@ -274,7 +286,10 @@ export class AuthService {
    * @param currentPassword - The current password for verification.
    * @throws {BadRequestException} If the user is not found or password is invalid.
    */
-  async changePassword(userId: string, currentPassword: string): Promise<void> {
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+  ): Promise<verificationTokens | void> {
     const user: User | null = await this.userRepo.findOne({
       where: { id: userId },
       select: {
@@ -310,15 +325,23 @@ export class AuthService {
       return;
     }
 
+    const resetPasswordUrl: string = this.embedTokenIntoUrl(
+      'auth/reset-password',
+      resetPasswordToken,
+    );
+
     const eventParams: AuthEventsPayload = {
-      url: this.embedTokenIntoUrl('auth/reset-password', resetPasswordToken),
+      url: resetPasswordUrl,
       email: user.email,
       name: user.first_name || user.last_name || user.username,
     };
 
     this.eventEmitter.emit('auth.change-password', eventParams);
 
-    return;
+    return {
+      url: this.embedTokenIntoUrl('auth/reset-password', resetPasswordToken),
+      token: resetPasswordToken,
+    };
   }
 
   /**
@@ -329,7 +352,7 @@ export class AuthService {
    * @param email - The email address to validate.
    * @returns A promise that resolves with void.
    */
-  async forgotPassword(email: string): Promise<void> {
+  async forgotPassword(email: string): Promise<verificationTokens | void> {
     const existingUser: User | null = await this.userRepo.findOneBy({ email });
 
     if (!existingUser) return;
@@ -339,13 +362,18 @@ export class AuthService {
       existingUser.id,
     );
 
+    const resetPasswordUrl = this.embedTokenIntoUrl(
+      'auth/reset-password',
+      resetPasswordToken,
+    );
+
     if (!resetPasswordToken) {
       this.logger.error('Failed to create reset password token.');
       return;
     }
 
     const eventParams: AuthEventsPayload = {
-      url: this.embedTokenIntoUrl('auth/reset-password', resetPasswordToken),
+      url: resetPasswordUrl,
       email: existingUser.email,
       name:
         existingUser.first_name ||
@@ -355,7 +383,10 @@ export class AuthService {
 
     this.eventEmitter.emit('auth.forgot-password', eventParams);
 
-    return;
+    return {
+      url: resetPasswordUrl,
+      token: resetPasswordToken,
+    };
   }
 
   /**
@@ -436,7 +467,9 @@ export class AuthService {
    * @param user The User that email verification token belongs to.
    * @returns {Promise<void>}.
    */
-  private async handleUserEmailVerification(user: User): Promise<void> {
+  private async handleUserEmailVerification(
+    user: User,
+  ): Promise<verificationTokens> {
     // delete old tokens
     await this.tokenRepo.delete({
       user_id: user.id,
@@ -462,6 +495,8 @@ export class AuthService {
 
     // Fire event to (send email for verification)
     this.eventEmitter.emit('auth.verificationEmail', eventParams);
+
+    return { token: token, url: url };
   }
 
   /**

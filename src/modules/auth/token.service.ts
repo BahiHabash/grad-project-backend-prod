@@ -73,9 +73,7 @@ export class TokenService {
       type: TokenType.REFRESH,
       user_id: userId,
       token,
-      // expires_at: new Date(
-      //   this.config.get<number>('REFRESH_TOKEN_TTL') + Date.now(),
-      // ),
+      expires_at: new Date(this.tokenConfig.refreshTtl + Date.now()),
     });
 
     return token;

@@ -169,7 +169,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ResponseMessage('Please, check your email for verification')
   async requestEmailVerification(@CurrentUser() payload: AccessTokenPayload) {
-    await this.authService.requestEmailVerification(payload.id);
+    return await this.authService.requestEmailVerification(payload.id);
   }
 
   /**
@@ -185,9 +185,10 @@ export class AuthController {
   @ResponseMessage('Please, check your email for password reset')
   async forgotPassword(
     @Body() forgotPasswordReqDto: ForgotPasswordReqDto,
-  ): Promise<null> {
-    await this.authService.forgotPassword(forgotPasswordReqDto.email);
-    return null;
+    // ): Promise<null> {
+  ): Promise<any> {
+    return await this.authService.forgotPassword(forgotPasswordReqDto.email);
+    // return null;
   }
 
   /**
@@ -244,11 +245,12 @@ export class AuthController {
   async changePassword(
     @Body() changePasswordReqDto: ChangePasswordReqDto,
     @CurrentUser() payload: AccessTokenPayload,
-  ): Promise<null> {
-    await this.authService.changePassword(
+    // ): Promise<null> {
+  ): Promise<any> {
+    return await this.authService.changePassword(
       payload.id,
       changePasswordReqDto.currentPassword,
     );
-    return null;
+    // return null;
   }
 }

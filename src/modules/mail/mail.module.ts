@@ -21,12 +21,19 @@ import { MailListener } from './mail.listener';
             pass: mailConfig.password,
           },
           tls: {
+            ciphers: 'SSLv3', // Helps with some older servers
             rejectUnauthorized: false,
           },
         },
+
+        family: 4,
+        connectionTimeout: 10000,
+        greetingTimeout: 5000,
+        socketTimeout: 10000,
         defaults: {
           from: mailConfig.fromAddress,
         },
+
         template: {
           dir: join(__dirname, 'templates'),
           adapter: new EjsAdapter(),

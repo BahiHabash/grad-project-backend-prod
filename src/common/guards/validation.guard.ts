@@ -33,7 +33,9 @@ export const ValidationGuard = <T extends object>(
   class ValidationGuardMixin implements CanActivate {
     async canActivate(context: ExecutionContext): Promise<boolean> {
       const request: Request = context.switchToHttp().getRequest();
-      const dtoInstance: T = plainToInstance(dto, request.body);
+      // const dtoInstance: T = plainToInstance(dto, request.body);
+      const body = request.body || {};
+      const dtoInstance: T = plainToInstance(dto, body);
 
       const errors: ValidationError[] = await validate(dtoInstance, {
         whitelist: true,

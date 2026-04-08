@@ -554,6 +554,7 @@ export class AuthService {
       username: user.username,
       status: user.status,
       sys_role: user.system_role,
+      club_id: user.memberships?.[0]?.club?.id || null,
       mem_role: user.memberships?.[0]?.role || undefined,
     };
   }

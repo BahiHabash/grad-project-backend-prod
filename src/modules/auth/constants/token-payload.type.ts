@@ -6,5 +6,6 @@ export type AccessTokenPayload = {
   username: string;
   status: string;
   sys_role: SystemRole;
+  club_id: string | null;
   mem_role: MemberRole | undefined;
 };

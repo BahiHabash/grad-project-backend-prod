@@ -15,6 +15,7 @@ import { TransformResponseInterceptor } from './common/interceptor/transform.int
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { JwtAuthGuard } from './modules/auth/guards/jwt.guard';
 import { PrematchModule } from './modules/prematch/prematch.module';
+import { PostmatchModule } from './modules/postmatch/postmatch.module';
 
 /**
  * The root module of the application and the starting point.
@@ -34,6 +35,7 @@ import { PrematchModule } from './modules/prematch/prematch.module';
     InvitationModule,
     ApplicationModule,
     PrematchModule,
+    PostmatchModule,
   ],
   controllers: [AppController],
   providers: [

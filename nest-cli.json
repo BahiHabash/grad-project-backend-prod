@@ -8,6 +8,10 @@
       {
         "include": "**/*.ejs",
         "outDir": "dist/src"
+      },
+      {
+        "include": "modules/postmatch/templates/**/*.txt",
+        "outDir": "dist/src"
       }
     ],
     "watchAssets": true

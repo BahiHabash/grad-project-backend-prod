@@ -59,7 +59,7 @@ export class UserProfileResDto {
   @Expose()
   @ApiProperty()
   get is_club_member(): boolean {
-    return this.club_id !== null;
+    return !!this.club_id;
   }
 
   @Expose()

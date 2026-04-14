@@ -1,55 +1,88 @@
 import {
   Controller,
   Get,
-  Post,
-  Body,
   Patch,
-  Param,
   Delete,
+  Body,
+  Param,
+  UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiOkResponse,
+  ApiNotFoundResponse,
+} from '@nestjs/swagger';
 import { UserService } from './user.service';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserProfileResDto } from './dto/user-profile-res.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { AccessTokenPayload } from '../auth/constants/token-payload.type';
+import { ValidationGuard } from '../../common/guards/validation.guard';
+import { SysRoles } from '../../common/decorators/roles.decorator';
+import { SystemRole } from '../../common/enums/system-role.enum';
+import { ResponseMessage } from '../../common/decorators/response-message.decorator';
+import { plainToInstance } from 'class-transformer';
 
-@Controller('user')
+@ApiTags('users')
+@ApiBearerAuth()
+@Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.create(createUserDto);
+  @Get('me')
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiOkResponse({
+    description: 'Current user profile retrieved successfully',
+    type: UserProfileResDto,
+  })
+  async getMyProfile(
+    @CurrentUser() user: AccessTokenPayload,
+  ): Promise<UserProfileResDto> {
+    const userProfile = await this.userService.getProfile(user.id);
+    return plainToInstance(UserProfileResDto, userProfile, {
+      excludeExtraneousValues: true,
+    });
   }
 
-  @Get()
-  findAll() {
-    return this.userService.findAll();
+  @Patch('me')
+  @UseGuards(ValidationGuard(UpdateUserDto))
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiOkResponse({ type: UserProfileResDto })
+  @ResponseMessage('Profile updated successfully')
+  async updateMyProfile(
+    @CurrentUser() user: AccessTokenPayload,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.userService.updateProfile(user.id, updateUserDto);
+  }
+
+  @Patch('me/deactivate')
+  @ApiOperation({ summary: 'Deactivate your account' })
+  @ApiOkResponse({ description: 'Account deactivated' })
+  @ResponseMessage('Account deactivated')
+  async deactivateAccount(@CurrentUser() user: AccessTokenPayload) {
+    await this.userService.deactivateAccount(user.id);
+    return null;
+  }
+
+  @Delete('me')
+  @ApiOperation({ summary: 'Soft delete your account' })
+  @ApiOkResponse({ description: 'Account soft deleted' })
+  @ResponseMessage('Account deleted')
+  async softDeleteAccount(@CurrentUser() user: AccessTokenPayload) {
+    await this.userService.softDeleteAccount(user.id);
+    return null;
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOneById(id);
-  }
-
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.userService.findOne(+id);
-  // }
-
-  @Patch(':id')
-  /*************  ✨ Codeium Command ⭐  *************/
-  /**
-   * Updates a user by its id
-   * @param id user's id
-   * @param updateUserDto user's data to update
-   * @returns updated user
-   */
-  /******  d0d1ef79-c121-4d45-8284-a465e324d94d  *******/
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(+id, updateUserDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
+  @SysRoles(SystemRole.ADMIN)
+  @ApiOperation({ summary: 'Admin: Get user by Id' })
+  @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiOkResponse({ type: UserProfileResDto })
+  async getUserById(@Param('id', ParseUUIDPipe) id: string) {
+    return this.userService.findOneByIdOrFail(id);
   }
 }

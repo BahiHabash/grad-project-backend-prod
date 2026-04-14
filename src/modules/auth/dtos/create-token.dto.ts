@@ -6,7 +6,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { TokenType } from '../constants/token-type.enum';
+import { AuthTokenType } from '../constants/auth-token-type.enum';
 
 export class CreateTokenDto {
   @IsNotEmpty()
@@ -14,8 +14,8 @@ export class CreateTokenDto {
   token: string;
 
   @IsNotEmpty()
-  @IsEnum(TokenType)
-  type: TokenType;
+  @IsEnum(AuthTokenType)
+  type: AuthTokenType;
 
   @IsNotEmpty()
   @IsUUID()

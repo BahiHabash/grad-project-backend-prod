@@ -4,7 +4,7 @@ import { envValidationSchema } from './env-validation.schema';
 import {
   AppConfig,
   DatabaseConfig,
-  TokenConfig,
+  AuthTokenConfig,
   MailConfig,
 } from './configrations/index';
 
@@ -19,7 +19,7 @@ import {
       validationSchema: envValidationSchema,
     }),
   ],
-  providers: [AppConfig, DatabaseConfig, TokenConfig, MailConfig],
-  exports: [AppConfig, DatabaseConfig, TokenConfig, MailConfig],
+  providers: [AppConfig, DatabaseConfig, AuthTokenConfig, MailConfig],
+  exports: [AppConfig, DatabaseConfig, AuthTokenConfig, MailConfig],
 })
 export class ConfigModule {}

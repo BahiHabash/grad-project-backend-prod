@@ -1,14 +1,14 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TokenConfig } from '../../core/config';
+import { AuthTokenConfig } from '../../core/config';
 import { JwtService } from '@nestjs/jwt';
 import { PinoLogger } from 'nestjs-pino';
 import * as crypto from 'crypto';
 
-import { Token } from './entities/token.entity';
+import { AuthToken } from './entities/token.entity';
 import { CreateTokenDto } from './dtos/create-token.dto';
-import { TokenType } from './constants/token-type.enum';
+import { AuthTokenType } from './constants/auth-token-type.enum';
 import type { AccessTokenPayload } from './constants/token-payload.type';
 
 /**
@@ -16,11 +16,11 @@ import type { AccessTokenPayload } from './constants/token-payload.type';
  * Handles the creation of tokens (Access, Refresh, Verify_Email, etc).
  */
 @Injectable()
-export class TokenService {
+export class AuthTokenService {
   constructor(
-    @InjectRepository(Token)
-    private readonly tokenRepo: Repository<Token>,
-    private readonly tokenConfig: TokenConfig,
+    @InjectRepository(AuthToken)
+    private readonly tokenRepo: Repository<AuthToken>,
+    private readonly tokenConfig: AuthTokenConfig,
     private readonly logger: PinoLogger,
     private readonly jwtService: JwtService,
   ) {}
@@ -31,7 +31,7 @@ export class TokenService {
    * @returns The saved Token entity.
    * @throws InternalServerErrorException if database persistence fails.
    */
-  async createTokenRecord(dto: CreateTokenDto): Promise<Token> {
+  async createTokenRecord(dto: CreateTokenDto): Promise<AuthToken> {
     const { token, ...tokenDto } = dto;
 
     // Handle expiration calculation if not provided
@@ -47,7 +47,7 @@ export class TokenService {
      */
     const hashedToken = this.hashToken(token);
 
-    const tokenData: Partial<Token> = {
+    const tokenData: Partial<AuthToken> = {
       token_hash: hashedToken,
       ...tokenDto,
     };
@@ -70,7 +70,7 @@ export class TokenService {
     const token = this.generateRandomToken();
 
     await this.createTokenRecord({
-      type: TokenType.REFRESH,
+      type: AuthTokenType.REFRESH,
       user_id: userId,
       token,
       expires_at: new Date(this.tokenConfig.refreshTtl + Date.now()),

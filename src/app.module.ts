@@ -4,11 +4,7 @@ import { CoreModule } from './core/core.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ClubModule } from './modules/club/club.module';
-import { TeamModule } from './modules/team/team.module';
-import { MemberModule } from './modules/member/member.module';
-import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { InvitationModule } from './modules/invitation/invitation.module';
-import { ApplicationModule } from './modules/application/application.module';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptor/transform.interceptor';
@@ -16,6 +12,8 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { JwtAuthGuard } from './modules/auth/guards/jwt.guard';
 import { PrematchModule } from './modules/prematch/prematch.module';
 import { PostmatchModule } from './modules/postmatch/postmatch.module';
+import { StorageModule } from './modules/storage/storage.module';
+
 
 /**
  * The root module of the application and the starting point.
@@ -29,13 +27,10 @@ import { PostmatchModule } from './modules/postmatch/postmatch.module';
     UserModule,
     AuthModule,
     ClubModule,
-    TeamModule,
-    MemberModule,
-    AnalyticsModule,
     InvitationModule,
-    ApplicationModule,
     PrematchModule,
     PostmatchModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [

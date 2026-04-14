@@ -9,18 +9,18 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Token } from './entities/token.entity';
+import { AuthToken } from './entities/token.entity';
 import { User } from '../user/entities/user.entity';
 import { SignUpReqDto } from './dtos/sign-up.dto';
 import type { CreateTokenDto } from './dtos/create-token.dto';
-import { TokenType } from './constants/token-type.enum';
+import { AuthTokenType } from './constants/auth-token-type.enum';
 import { AuthEventsPayload } from './constants/auth-events-payload';
 import { PASSWORD_HASH_SALT_ROUNDS } from './constants/auth.constants';
 import { PinoLogger } from 'nestjs-pino';
-import { TokenService } from './token.service';
+import { AuthTokenService } from './auth-token.service';
 import type { AccessTokenPayload } from './constants/token-payload.type';
 import { UserService } from '../user/user.service';
-import { AccountStatus } from '../user/constants/account-status.enum';
+import { AccountStatus } from '../../common/enums/account-status.enum';
 import type { AuthTokens } from './constants/auth-tokens.type';
 
 type verificationTokens = {
@@ -44,12 +44,12 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
-    @InjectRepository(Token)
-    private tokenRepo: Repository<Token>,
+    @InjectRepository(AuthToken)
+    private tokenRepo: Repository<AuthToken>,
     private readonly eventEmitter: EventEmitter2,
     private readonly appConfig: AppConfig,
     private readonly logger: PinoLogger,
-    private readonly tokenService: TokenService,
+    private readonly tokenService: AuthTokenService,
     private readonly userService: UserService,
   ) {}
 
@@ -177,19 +177,23 @@ export class AuthService {
    * @throws {BadRequestException} If the user is not found, token is invalid, or expired.
    */
   async verifyUserEmail(id: string, token: string): Promise<User> {
-    const user: User | null = await this.userRepo.findOne({
-      where: { id: id, status: AccountStatus.PENDING_VERIFICATION },
-    });
+    const user: User | null = await this.userRepo.findOneBy({ id });
 
     if (!user) {
       throw new BadRequestException('User not found');
     }
 
-    const verifyToken: Token | null = await this.tokenRepo.findOne({
+    if (
+      user.is_verified
+    ) {
+      throw new BadRequestException('User is already verified');
+    }
+
+    const verifyToken: AuthToken | null = await this.tokenRepo.findOne({
       where: {
         token_hash: this.tokenService.hashToken(token),
         user_id: user.id,
-        type: TokenType.EMAIL_VERIFY,
+        type: AuthTokenType.EMAIL_VERIFY,
         expires_at: MoreThan(new Date()),
       },
     });
@@ -249,8 +253,8 @@ export class AuthService {
     // Validate the refresh token
     const refreshTokenHash = this.tokenService.hashToken(refreshToken);
 
-    const token: Token | null = await this.tokenRepo.findOne({
-      where: { token_hash: refreshTokenHash, type: TokenType.REFRESH },
+    const token: AuthToken | null = await this.tokenRepo.findOne({
+      where: { token_hash: refreshTokenHash, type: AuthTokenType.REFRESH },
     });
 
     if (!token || token.expires_at < new Date()) {
@@ -400,10 +404,10 @@ export class AuthService {
    * access and refresh tokens.
    */
   async resetPassword(newPassword: string, token: string): Promise<AuthTokens> {
-    const resetToken: Token | null = await this.tokenRepo.findOne({
+    const resetToken: AuthToken | null = await this.tokenRepo.findOne({
       where: {
         token_hash: this.tokenService.hashToken(token),
-        type: TokenType.PASSWORD_RESET,
+        type: AuthTokenType.PASSWORD_RESET,
         expires_at: MoreThan(new Date()),
       },
     });
@@ -452,7 +456,7 @@ export class AuthService {
 
     const tokenRecord: CreateTokenDto = {
       user_id: userId,
-      type: TokenType.PASSWORD_RESET,
+      type: AuthTokenType.PASSWORD_RESET,
       token,
     };
 
@@ -473,7 +477,7 @@ export class AuthService {
     // delete old tokens
     await this.tokenRepo.delete({
       user_id: user.id,
-      type: TokenType.EMAIL_VERIFY,
+      type: AuthTokenType.EMAIL_VERIFY,
     });
 
     const token: string = this.tokenService.generateRandomToken();
@@ -483,7 +487,7 @@ export class AuthService {
 
     await this.tokenService.createTokenRecord({
       user_id: user.id,
-      type: TokenType.EMAIL_VERIFY,
+      type: AuthTokenType.EMAIL_VERIFY,
       token,
     });
 
@@ -554,8 +558,8 @@ export class AuthService {
       username: user.username,
       status: user.status,
       sys_role: user.system_role,
-      club_id: user.memberships?.[0]?.club?.id || null,
-      mem_role: user.memberships?.[0]?.role || undefined,
+      club_id: user.club_id || null,
+      mem_role: user.member_role || undefined,
     };
   }
 }

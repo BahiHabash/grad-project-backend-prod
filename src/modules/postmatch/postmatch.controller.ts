@@ -39,6 +39,7 @@ export class PostmatchController {
       dto.eventId,
       dto.teamId,
       user.id,
+      user.club_id,
     );
 
     return this.toReportResponse(report, cached);
@@ -58,7 +59,7 @@ export class PostmatchController {
   ) {
     const { reports, total, page, limit } =
       await this.postmatchService.getReports(
-        user.id,
+        user.club_id,
         query.page!,
         query.limit!,
       );
@@ -80,8 +81,11 @@ export class PostmatchController {
       'Returns the full report including raw analysis and LLM explanation.',
   })
   @ResponseMessage('Report retrieved successfully.')
-  async getReport(@Param('id', ParseUUIDPipe) id: string) {
-    const report = await this.postmatchService.getReport(id);
+  async getReport(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AccessTokenPayload,
+  ) {
+    const report = await this.postmatchService.getReport(id, user.club_id);
     return this.toReportResponse(report, true);
   }
 
@@ -94,8 +98,14 @@ export class PostmatchController {
       'Re-runs the LLM explanation step for a report that has status PARTIAL. Does NOT re-run the AI analysis.',
   })
   @ResponseMessage('LLM explanation generated successfully.')
-  async retryExplanation(@Param('id', ParseUUIDPipe) id: string) {
-    const report = await this.postmatchService.retryExplanation(id);
+  async retryExplanation(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AccessTokenPayload,
+  ) {
+    const report = await this.postmatchService.retryExplanation(
+      id,
+      user.club_id,
+    );
     return this.toReportResponse(report, false);
   }
 

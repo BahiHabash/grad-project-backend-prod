@@ -57,7 +57,12 @@ export class PostMatchReport {
 
   // ─── Ownership ───────────────────────────────────────────────────────────
 
-  /** The user who triggered this analysis. */
+  /** The club this report belongs to (multi-tenant isolation). */
+  @Column({ type: 'uuid' })
+  @Index()
+  club_id: string;
+
+  /** The user who triggered this analysis (audit trail). */
   @Column({ type: 'uuid' })
   requested_by_id: string;
 

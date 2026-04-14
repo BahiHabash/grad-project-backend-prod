@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadGatewayException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryFailedError } from 'typeorm';
@@ -35,9 +36,10 @@ interface PaginatedReports {
 /**
  * Orchestrates the post-match analysis pipeline.
  *
- * Flow: Check cache → Call AI → Validate → Call LLM → Store → Return
+ * Flow: Verify club → Check cache → Call AI → Validate → Call LLM → Store → Return
  *
  * Caching is team-based: one report per (event_id, team_id).
+ * Access is club-based: only members of the owning club can access reports.
  * `requested_by_id` is stored for audit purposes only.
  */
 @Injectable()
@@ -57,31 +59,39 @@ export class PostmatchService {
    *
    * Returns a cached report if one exists for (eventId, teamId),
    * otherwise runs the full AI → LLM → Store pipeline.
+   *
+   * @throws ForbiddenException if the user has no club membership
+   *         or the cached report belongs to a different club.
    */
   async analyzeMatch(
     eventId: string,
     teamId: string,
     userId: string,
+    clubId: string | null,
   ): Promise<ReportResult> {
-    // Step 1: Check cache (team-based, not user-based)
+    // Step 1: Verify club membership
+    this.requireClub(clubId);
+
+    // Step 2: Check cache (team-based, not user-based)
     const cached = await this.reportRepo.findOne({
       where: { event_id: eventId, team_id: teamId },
     });
 
     if (cached) {
+      this.enforceClubAccess(cached.club_id, clubId!);
       this.logger.info(`Cache hit for event=${eventId}, team=${teamId}`);
       return { report: cached, cached: true };
     }
 
     this.logger.info(`Cache miss. Starting analysis pipeline...`);
 
-    // Step 2: Call AI service
+    // Step 3: Call AI service
     const rawData = await this.aiClient.analyze(eventId, teamId);
 
-    // Step 3: Validate AI response against agreed contract
+    // Step 4: Validate AI response against agreed contract
     await this.validateAiResponse(rawData);
 
-    // Step 4: Call LLM (graceful degradation)
+    // Step 5: Call LLM (graceful degradation)
     let llmExplanation: string | null = null;
     let llmModel: string | null = null;
 
@@ -91,16 +101,17 @@ export class PostmatchService {
       llmModel = llmResult.model;
     }
 
-    // Step 5: Determine status
+    // Step 6: Determine status
     const status = llmExplanation
       ? ReportStatus.COMPLETED
       : ReportStatus.PARTIAL;
     const analysisTimestamp = this.extractAnalysisTimestamp(rawData);
 
-    // Step 6: Persist
+    // Step 7: Persist
     const report = this.reportRepo.create({
       event_id: eventId,
       team_id: teamId,
+      club_id: clubId!,
       raw_analysis: rawData,
       llm_explanation: llmExplanation,
       llm_model: llmModel,
@@ -134,7 +145,12 @@ export class PostmatchService {
 
   // ─── 2. Get Report by ID ──────────────────────────────────────────────
 
-  async getReport(reportId: string): Promise<PostMatchReport> {
+  async getReport(
+    reportId: string,
+    clubId: string | null,
+  ): Promise<PostMatchReport> {
+    this.requireClub(clubId);
+
     const report = await this.reportRepo.findOne({
       where: { id: reportId },
     });
@@ -143,18 +159,22 @@ export class PostmatchService {
       throw new NotFoundException(`Report with id "${reportId}" not found.`);
     }
 
+    this.enforceClubAccess(report.club_id, clubId!);
+
     return report;
   }
 
   // ─── 3. List Reports (Paginated) ──────────────────────────────────────
 
   async getReports(
-    userId: string,
+    clubId: string | null,
     page: number,
     limit: number,
   ): Promise<PaginatedReports> {
+    this.requireClub(clubId);
+
     const [reports, total] = await this.reportRepo.findAndCount({
-      where: { requested_by_id: userId },
+      where: { club_id: clubId! },
       order: { created_at: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -177,8 +197,11 @@ export class PostmatchService {
    * Retries the LLM explanation for a report that has status PARTIAL.
    * Does NOT re-run the AI analysis — only generates the missing explanation.
    */
-  async retryExplanation(reportId: string): Promise<PostMatchReport> {
-    const report = await this.getReport(reportId);
+  async retryExplanation(
+    reportId: string,
+    clubId: string | null,
+  ): Promise<PostMatchReport> {
+    const report = await this.getReport(reportId, clubId);
 
     if (report.status === ReportStatus.COMPLETED) {
       throw new ConflictException(
@@ -202,6 +225,24 @@ export class PostmatchService {
     this.logger.info(`Report ${reportId} explanation retried successfully.`);
 
     return updated;
+  }
+
+  // ─── Access Control ────────────────────────────────────────────────────
+
+  /** Throws 403 if the user has no club membership. */
+  private requireClub(clubId: string | null): asserts clubId is string {
+    if (!clubId) {
+      throw new ForbiddenException('No club membership found.');
+    }
+  }
+
+  /** Throws 403 if the report's club doesn't match the user's club. */
+  private enforceClubAccess(reportClubId: string, userClubId: string): void {
+    if (reportClubId !== userClubId) {
+      throw new ForbiddenException(
+        'You do not have access to this club\'s reports.',
+      );
+    }
   }
 
   // ─── Private Helpers ──────────────────────────────────────────────────

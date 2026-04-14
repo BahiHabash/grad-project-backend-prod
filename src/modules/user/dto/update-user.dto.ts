@@ -1,4 +1,11 @@
-import { IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateUserDto {
@@ -6,12 +13,28 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   @MaxLength(50)
+  @MinLength(3)
+  @Transform(({ value }): string | undefined => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed === '' ? undefined : trimmed;
+    }
+    return value;
+  })
   first_name?: string;
 
-  @ApiProperty({ description: 'Last name', required: false })
+  @ApiProperty({ description: 'First name', required: false })
   @IsOptional()
   @IsString()
   @MaxLength(50)
+  @MinLength(3)
+  @Transform(({ value }): string | undefined => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed === '' ? undefined : trimmed;
+    }
+    return value;
+  })
   last_name?: string;
 
   @ApiProperty({ description: 'Profile image URL', required: false })

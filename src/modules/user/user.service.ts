@@ -76,10 +76,9 @@ export class UserService {
     const user = await this.findOneByIdOrFail(userId);
 
     // Update user profile
-    if (dto.first_name !== undefined) user.first_name = dto.first_name;
-    if (dto.last_name !== undefined) user.last_name = dto.last_name;
-    if (dto.profile_image_url !== undefined)
-      user.profile_image_url = dto.profile_image_url;
+    if (dto.first_name) user.first_name = dto.first_name;
+    if (dto.last_name) user.last_name = dto.last_name;
+    if (dto.profile_image_url) user.profile_image_url = dto.profile_image_url;
 
     return await this.userRepo.save(user);
   }

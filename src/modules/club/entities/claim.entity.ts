@@ -49,7 +49,7 @@ export class Claim extends BaseEntity {
   justification: string | null;
 
   /** URLs of uploaded verification documents (IDs, contracts, etc.) */
-  @Column({ type: 'text', array: true, default: [] })
+  @Column({ type: 'text', array: true, default: () => "'{}'" })
   document_urls: string[];
 
   @Index()

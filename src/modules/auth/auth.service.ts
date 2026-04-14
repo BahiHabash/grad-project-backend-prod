@@ -184,8 +184,7 @@ export class AuthService {
     }
 
     if (
-      user.is_verified &&
-      user.status === AccountStatus.PENDING_VERIFICATION
+      user.is_verified
     ) {
       throw new BadRequestException('User is already verified');
     }

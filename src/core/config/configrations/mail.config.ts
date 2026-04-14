@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TokenConfig } from './token.config';
+import { AuthTokenConfig } from './auth-token.config';
 
 @Injectable()
 export class MailConfig {
   constructor(
     private configService: ConfigService,
-    private tokenConfig: TokenConfig,
+    private authTokenConfig: AuthTokenConfig,
   ) {}
 
   /**
@@ -60,6 +60,6 @@ export class MailConfig {
    * @returns The verification token TTL.
    */
   get verifyTokenTtl(): number {
-    return this.tokenConfig.emailVerifyTtl;
+    return this.authTokenConfig.emailVerifyTtl;
   }
 }

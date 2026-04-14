@@ -6,11 +6,11 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ALLOWED_SYSTEM_ROLES_KEY } from '../../../common/decorators/roles.decorator';
-import { SystemRole } from '../../user/constants/system-role.enum';
+import { SystemRole } from '../../../common/enums/system-role.enum';
 import { IS_PUBLIC_ENDPOINT_KEY } from '../../../common/decorators/public-endpoint.decorator';
 import { ALLOWED_MEMBER_ROLES_KEY } from '../../../common/decorators/roles.decorator';
 import { AccessTokenPayload } from '../constants/token-payload.type';
-import { MemberRole } from '../../../modules/member/constants/member-role.enum';
+import { MemberRole } from '../../../common/enums/member-role.enum';
 import { PinoLogger } from 'nestjs-pino';
 import type { RequestWithUser } from '../../../common/interfaces/Request.interface';
 

@@ -1,7 +1,6 @@
-export enum TokenType {
+export enum AuthTokenType {
   ACCESS = 'ACCESS',
   REFRESH = 'REFRESH',
   PASSWORD_RESET = 'PASSWORD_RESET',
   EMAIL_VERIFY = 'EMAIL_VERIFY',
-  INVITATION = 'INVITATION',
 }

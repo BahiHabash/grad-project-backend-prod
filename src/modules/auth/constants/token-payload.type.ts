@@ -1,5 +1,5 @@
-import type { MemberRole } from '../../member/constants/member-role.enum';
-import type { SystemRole } from '../../user/constants/system-role.enum';
+import type { MemberRole } from '../../../common/enums/member-role.enum';
+import type { SystemRole } from '../../../common/enums/system-role.enum';
 
 export type AccessTokenPayload = {
   id: string;

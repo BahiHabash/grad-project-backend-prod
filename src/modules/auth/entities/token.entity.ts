@@ -8,10 +8,10 @@ import {
   Index,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
-import { TokenType } from '../constants/token-type.enum';
+import { AuthTokenType } from '../constants/auth-token-type.enum';
 
-@Entity({ name: 'tokens' })
-export class Token {
+@Entity({ name: 'auth_tokens' })
+export class AuthToken {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -19,20 +19,20 @@ export class Token {
   @Column({ type: 'varchar', length: 250, nullable: false })
   token_hash: string;
 
-  @Column({ type: 'enum', enum: TokenType, nullable: false })
-  type: TokenType;
+  @Column({ type: 'enum', enum: AuthTokenType, nullable: false })
+  type: AuthTokenType;
 
-  @ManyToOne(() => User, (user) => user.tokens, {
+  @Column({ type: 'uuid', nullable: false })
+  user_id: string;
+
+  @ManyToOne(() => User, {
     onDelete: 'CASCADE',
     nullable: false,
   })
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ type: 'uuid', nullable: false })
-  user_id: string;
-
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp' })
   expires_at: Date;
 
   @CreateDateColumn()

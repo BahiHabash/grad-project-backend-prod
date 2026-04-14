@@ -245,12 +245,10 @@ export class AuthController {
   async changePassword(
     @Body() changePasswordReqDto: ChangePasswordReqDto,
     @CurrentUser() payload: AccessTokenPayload,
-    // ): Promise<null> {
   ): Promise<any> {
     return await this.authService.changePassword(
       payload.id,
       changePasswordReqDto.currentPassword,
     );
-    // return null;
   }
 }

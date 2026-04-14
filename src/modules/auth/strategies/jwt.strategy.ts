@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TokenConfig } from '../../../core/config';
+import { AuthTokenConfig } from '../../../core/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AccessTokenPayload } from '../constants/token-payload.type';
@@ -20,13 +20,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
    * @throws {Error} If ACCESS_TOKEN_SECRET is not defined in environment variables.
    */
   constructor(
-    private readonly TokenConfig: TokenConfig,
+    private readonly authTokenConfig: AuthTokenConfig,
     private readonly logger: PinoLogger,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: TokenConfig.accessSecret,
+      secretOrKey: authTokenConfig.accessSecret,
     });
   }
 

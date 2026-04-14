@@ -16,7 +16,7 @@ The module exports the following configuration services:
 - `AppConfig`: Application-level settings (env, port, base URL, CORS).
 - `DatabaseConfig`: Database connection URL.
 - `MailConfig`: Mailer settings (host, port, user, auth).
-- `TokenConfig`: Token secrets and TTLs (JWT, reset password, etc.).
+- `TokenConfig`: AuthToken secrets and TTLs (JWT, reset password, etc.).
 
 ## 3. How to Use
 

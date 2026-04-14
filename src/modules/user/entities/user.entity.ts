@@ -1,44 +1,47 @@
-import {
-  Entity,
-  Column,
-  OneToMany,
-  CreateDateColumn,
-  UpdateDateColumn,
-  PrimaryGeneratedColumn,
-  DeleteDateColumn,
-} from 'typeorm';
-import { Token } from '../../auth/entities/token.entity';
-import { Member } from '../../member/entities/member.entity';
-import { SystemRole } from '../constants/system-role.enum';
-import { AccountStatus } from '../constants/account-status.enum';
+import { Entity, Column, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { SystemRole } from '../../../common/enums/system-role.enum';
+import { AccountStatus } from '../../../common/enums/account-status.enum';
+import { MemberRole } from '../../../common/enums/member-role.enum';
+import { Club } from '../../club/entities/club.entity';
+import { Favorite } from './favorite.entity';
+import { BaseEntity } from '../../../common/entities/base.entity';
 
+/**
+ * Represents a registered user in the system.
+ *
+ * Users start as public (no club). They can submit a Claim to become a
+ * club Owner, or be invited as Staff. All tactical data is scoped by
+ * the user's club_id (logical multi-tenancy).
+ *
+ * @field email        - Unique login identifier
+ * @field username     - Unique public handle
+ * @field system_role  - Platform-level role (USER / REVIEWER / ADMIN)
+ * @field member_role  - Club-level role (OWNER / STAFF), null if no club
+ * @field status       - Account lifecycle state
+ *
+ * @relation club      - The club the user belongs to (nullable)
+ * @relation favorites - User's favorited SofaScore entities
+ */
 @Entity('users')
-export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ unique: true })
+export class User extends BaseEntity {
+  @Column({ type: 'varchar', length: 70, unique: true })
   email: string;
 
   @Column({ type: 'varchar', length: 50, unique: true })
   username: string;
 
-  @Column({ select: false }) // Hide password from default queries
+  @Column({ type: 'varchar', length: 200, select: false })
   password_hash: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: false })
   first_name: string;
 
-  @Column({ nullable: true })
-  last_name: string;
+  @Column({ type: 'varchar', length: 50, nullable: true, default: null })
+  last_name: string | null;
 
   @Column({ default: false })
-  is_verified: boolean; // For email verification
+  is_verified: boolean;
 
-  @Column({ default: false })
-  is_2fa_enabled: boolean; // For 2-factor auth verification
-
-  // --- NEW ACCOUNT STATUS ---
   @Column({
     type: 'enum',
     enum: AccountStatus,
@@ -46,7 +49,19 @@ export class User {
   })
   status: AccountStatus;
 
-  // --- NEW SYSTEM ROLE ---
+  @Column({ type: 'uuid', nullable: true })
+  club_id: string | null;
+
+  @ManyToOne(() => Club, (club) => club.users, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'club_id' })
+  club: Club | null;
+
+  @Column({ type: 'enum', enum: MemberRole, nullable: true })
+  member_role: MemberRole | null;
+
   @Column({
     type: 'enum',
     enum: SystemRole,
@@ -54,29 +69,13 @@ export class User {
   })
   system_role: SystemRole;
 
-  // A User can be a member of many clubs
-  @OneToMany(() => Member, (member) => member.user, {
-    nullable: true,
-    onDelete: 'SET NULL',
-  })
-  memberships: Member[];
-
-  // A User can have many auth tokens (e.g., refresh tokens)
-  @OneToMany(() => Token, (token) => token.user)
-  tokens: Token[];
-
-  @Column({ type: 'timestamptz', default: new Date() })
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   last_security_action_at: Date;
 
-  @Column({ nullable: true })
-  profile_image_url: string;
+  @Column({ type: 'varchar', length: 500, nullable: true, default: null })
+  profile_image_url: string | null;
 
-  @CreateDateColumn()
-  created_at: Date;
-
-  @UpdateDateColumn()
-  updated_at: Date;
-
-  @DeleteDateColumn()
-  deleted_at: Date; // This will be null by default
+  /** User's favorited SofaScore entities (leagues, teams, players) */
+  @OneToMany(() => Favorite, (fav) => fav.user)
+  favorites: Favorite[];
 }

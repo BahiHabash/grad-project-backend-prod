@@ -60,3 +60,10 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # personal notes
 *.notes*
 notes*
+
+# agent
+.agent
+.agents
+
+secrets
+.secrets/

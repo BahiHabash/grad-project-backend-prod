@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TokenType } from '../../../modules/auth/constants/token-type.enum';
+import { AuthTokenType } from '../../../modules/auth/constants/auth-token-type.enum';
 import ms, { StringValue } from 'ms';
 
 @Injectable()
-export class TokenConfig {
+export class AuthTokenConfig {
   constructor(private configService: ConfigService) {}
 
   /**
@@ -87,7 +87,7 @@ export class TokenConfig {
    * @param type - The token type.
    * @returns The TTL for the given token type in milliseconds.
    */
-  tokenTtl(type: TokenType): number {
+  tokenTtl(type: AuthTokenType): number {
     const ttl: number = this.TTL_MAP[type];
 
     if (!ttl) {
@@ -97,11 +97,10 @@ export class TokenConfig {
     return ttl;
   }
 
-  private readonly TTL_MAP: Record<TokenType, number> = {
-    [TokenType.ACCESS]: this.accessTtl,
-    [TokenType.REFRESH]: this.refreshTtl,
-    [TokenType.PASSWORD_RESET]: this.passwordResetTtl,
-    [TokenType.EMAIL_VERIFY]: this.emailVerifyTtl,
-    [TokenType.INVITATION]: this.invitationTtl,
+  private readonly TTL_MAP: Record<AuthTokenType, number> = {
+    [AuthTokenType.ACCESS]: this.accessTtl,
+    [AuthTokenType.REFRESH]: this.refreshTtl,
+    [AuthTokenType.PASSWORD_RESET]: this.passwordResetTtl,
+    [AuthTokenType.EMAIL_VERIFY]: this.emailVerifyTtl,
   };
 }

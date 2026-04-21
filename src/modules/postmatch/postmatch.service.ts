@@ -12,12 +12,11 @@ import { plainToInstance } from 'class-transformer';
 import { validate, type ValidationError } from 'class-validator';
 
 import { PostMatchReport } from './entities/postmatch-report.entity';
+import { Club } from '../club/entities/club.entity';
 import { AiModelClient } from './providers/ai-model.client';
 import { LlmClient } from './providers/llm/llm.client';
 import { AiAnalysisDto } from './dto/ai-analysis.dto';
 import { ReportStatus } from './constants/report-status.enum';
-
-// ─── Return types ────────────────────────────────────────────────────────────
 
 interface ReportResult {
   report: PostMatchReport;
@@ -31,37 +30,40 @@ interface PaginatedReports {
   limit: number;
 }
 
-// ─── Service ─────────────────────────────────────────────────────────────────
-
 /**
  * Orchestrates the post-match analysis pipeline.
  *
- * Flow: Verify club → Check cache → Call AI → Validate → Call LLM → Store → Return
+ * Flow: Verify club → Verify team ownership → Check cache → Call AI → Validate → Call LLM → Store → Return
  *
  * Caching is team-based: one report per (event_id, team_id).
- * Access is club-based: only members of the owning club can access reports.
- * `requested_by_id` is stored for audit purposes only.
+ * Access is club-based and team-scoped: users can only analyze their own team.
  */
 @Injectable()
 export class PostmatchService {
   constructor(
     @InjectRepository(PostMatchReport)
     private readonly reportRepo: Repository<PostMatchReport>,
+    @InjectRepository(Club)
+    private readonly clubRepo: Repository<Club>,
     private readonly aiClient: AiModelClient,
     private readonly llmClient: LlmClient,
     private readonly logger: PinoLogger,
   ) {}
 
-  // ─── 1. Analyze Match ──────────────────────────────────────────────────
-
   /**
    * Triggers a full post-match analysis for a given match and team.
    *
-   * Returns a cached report if one exists for (eventId, teamId),
+   * Returns a cached report if one already exists for the (eventId, teamId) pair,
    * otherwise runs the full AI → LLM → Store pipeline.
    *
-   * @throws ForbiddenException if the user has no club membership
-   *         or the cached report belongs to a different club.
+   * @param eventId - SofaScore event/match ID.
+   * @param teamId - SofaScore team ID.
+   * @param userId - ID of the requesting user (audit trail).
+   * @param clubId - Club ID from JWT (access control).
+   * @returns The report and a flag indicating whether it was cached.
+   * @throws ForbiddenException if user has no club, team ID mismatch, or club mismatch on cache hit.
+   * @throws NotFoundException if the user's club does not exist in the database.
+   * @throws BadGatewayException if AI service fails or returns invalid data.
    */
   async analyzeMatch(
     eventId: string,
@@ -69,10 +71,11 @@ export class PostmatchService {
     userId: string,
     clubId: string | null,
   ): Promise<ReportResult> {
-    // Step 1: Verify club membership
     this.requireClub(clubId);
 
-    // Step 2: Check cache (team-based, not user-based)
+    const clubTeamId = await this.resolveClubTeamId(clubId);
+    this.enforceTeamAccess(teamId, clubTeamId);
+
     const cached = await this.reportRepo.findOne({
       where: { event_id: eventId, team_id: teamId },
     });
@@ -85,13 +88,9 @@ export class PostmatchService {
 
     this.logger.info(`Cache miss. Starting analysis pipeline...`);
 
-    // Step 3: Call AI service
     const rawData = await this.aiClient.analyze(eventId, teamId);
-
-    // Step 4: Validate AI response against agreed contract
     await this.validateAiResponse(rawData);
 
-    // Step 5: Call LLM (graceful degradation)
     let llmExplanation: string | null = null;
     let llmModel: string | null = null;
 
@@ -101,13 +100,11 @@ export class PostmatchService {
       llmModel = llmResult.model;
     }
 
-    // Step 6: Determine status
     const status = llmExplanation
       ? ReportStatus.COMPLETED
       : ReportStatus.PARTIAL;
     const analysisTimestamp = this.extractAnalysisTimestamp(rawData);
 
-    // Step 7: Persist
     const report = this.reportRepo.create({
       event_id: eventId,
       team_id: teamId,
@@ -143,8 +140,15 @@ export class PostmatchService {
     }
   }
 
-  // ─── 2. Get Report by ID ──────────────────────────────────────────────
-
+  /**
+   * Retrieves a single report by ID with club-based access control.
+   *
+   * @param reportId - UUID of the report.
+   * @param clubId - Club ID from JWT (access control).
+   * @returns The matching report.
+   * @throws NotFoundException if the report does not exist.
+   * @throws ForbiddenException if user has no club or club mismatch.
+   */
   async getReport(
     reportId: string,
     clubId: string | null,
@@ -164,8 +168,15 @@ export class PostmatchService {
     return report;
   }
 
-  // ─── 3. List Reports (Paginated) ──────────────────────────────────────
-
+  /**
+   * Returns a paginated list of reports belonging to the user's club.
+   *
+   * @param clubId - Club ID from JWT (access control + filter).
+   * @param page - Page number (1-indexed).
+   * @param limit - Number of items per page.
+   * @returns Paginated reports with total count.
+   * @throws ForbiddenException if user has no club.
+   */
   async getReports(
     clubId: string | null,
     page: number,
@@ -191,11 +202,17 @@ export class PostmatchService {
     return { reports, total, page, limit };
   }
 
-  // ─── 4. Retry LLM Explanation ─────────────────────────────────────────
-
   /**
-   * Retries the LLM explanation for a report that has status PARTIAL.
+   * Retries the LLM explanation for a PARTIAL report.
    * Does NOT re-run the AI analysis — only generates the missing explanation.
+   *
+   * @param reportId - UUID of the report to retry.
+   * @param clubId - Club ID from JWT (access control).
+   * @returns The updated report with status COMPLETED.
+   * @throws ForbiddenException if user has no club or club mismatch.
+   * @throws NotFoundException if the report does not exist.
+   * @throws ConflictException if the report is already COMPLETED.
+   * @throws BadGatewayException if all LLM adapters fail.
    */
   async retryExplanation(
     reportId: string,
@@ -227,16 +244,25 @@ export class PostmatchService {
     return updated;
   }
 
-  // ─── Access Control ────────────────────────────────────────────────────
-
-  /** Throws 403 if the user has no club membership. */
+  /**
+   * Asserts that the user has a club membership.
+   *
+   * @param clubId - Club ID from JWT.
+   * @throws ForbiddenException if clubId is null.
+   */
   private requireClub(clubId: string | null): asserts clubId is string {
     if (!clubId) {
       throw new ForbiddenException('No club membership found.');
     }
   }
 
-  /** Throws 403 if the report's club doesn't match the user's club. */
+  /**
+   * Asserts that the report belongs to the user's club.
+   *
+   * @param reportClubId - Club ID stored on the report.
+   * @param userClubId - Club ID from JWT.
+   * @throws ForbiddenException if clubs do not match.
+   */
   private enforceClubAccess(reportClubId: string, userClubId: string): void {
     if (reportClubId !== userClubId) {
       throw new ForbiddenException(
@@ -245,14 +271,49 @@ export class PostmatchService {
     }
   }
 
-  // ─── Private Helpers ──────────────────────────────────────────────────
+  /**
+   * Fetches the club's SofaScore team ID from the database.
+   *
+   * @param clubId - Internal club UUID.
+   * @returns The club's sofa_score_club_id.
+   * @throws NotFoundException if the club does not exist.
+   */
+  private async resolveClubTeamId(clubId: string): Promise<string> {
+    const club = await this.clubRepo.findOne({
+      where: { id: clubId },
+      select: ['sofa_score_club_id'],
+    });
+
+    if (!club) {
+      throw new NotFoundException('Club not found.');
+    }
+
+    return club.sofa_score_club_id;
+  }
 
   /**
-   * Validates the raw AI response against the agreed contract (AiAnalysisDto).
-   * Throws BadGatewayException if required fields are missing or malformed.
+   * Asserts that the requested team ID matches the user's club team.
    *
-   * Uses whitelist:false because the AI contract is stable and trusted —
-   * extra fields are accepted and stored as-is.
+   * @param requestedTeamId - The teamId from the request body.
+   * @param clubTeamId - The sofa_score_club_id from the database.
+   * @throws ForbiddenException if the IDs do not match.
+   */
+  private enforceTeamAccess(
+    requestedTeamId: string,
+    clubTeamId: string,
+  ): void {
+    if (requestedTeamId !== clubTeamId) {
+      throw new ForbiddenException(
+        'You can only analyze your own team.',
+      );
+    }
+  }
+
+  /**
+   * Validates the raw AI response against the AiAnalysisDto contract.
+   *
+   * @param data - Raw JSON object from the AI service.
+   * @throws BadGatewayException if required fields are missing or malformed.
    */
   private async validateAiResponse(data: object): Promise<void> {
     const dto = plainToInstance(AiAnalysisDto, data);
@@ -270,7 +331,13 @@ export class PostmatchService {
     }
   }
 
-  /** Flattens class-validator errors, including nested property paths. */
+  /**
+   * Flattens class-validator errors into an array of readable strings.
+   *
+   * @param errors - Array of ValidationError from class-validator.
+   * @param parentPath - Dot-delimited parent path for nested errors.
+   * @returns Flat array of error messages with full property paths.
+   */
   private flattenValidationErrors(
     errors: ValidationError[],
     parentPath = '',
@@ -298,7 +365,12 @@ export class PostmatchService {
     return flattened;
   }
 
-  /** Detects PostgreSQL duplicate key violation (SQLSTATE 23505). */
+  /**
+   * Detects a PostgreSQL unique constraint violation (SQLSTATE 23505).
+   *
+   * @param error - The caught error from a DB save operation.
+   * @returns True if the error is a duplicate key violation.
+   */
   private isUniqueViolation(error: unknown): boolean {
     if (!(error instanceof QueryFailedError)) {
       return false;
@@ -310,7 +382,12 @@ export class PostmatchService {
     return driverError?.code === '23505';
   }
 
-  /** Safely extracts analysis timestamp from AI payload if present and valid. */
+  /**
+   * Extracts the analysis timestamp from the AI payload if present and valid.
+   *
+   * @param rawData - Raw AI response object.
+   * @returns Parsed Date or null if missing/invalid.
+   */
   private extractAnalysisTimestamp(rawData: object): Date | null {
     const value = (rawData as Record<string, unknown>).analysis_timestamp;
 

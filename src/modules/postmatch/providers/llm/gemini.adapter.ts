@@ -4,14 +4,13 @@ import {
   type GenerateContentResult,
 } from '@google/generative-ai';
 import { LlmAdapter } from './llm-adapter.interface';
-import { LLM_ADAPTER_TIMEOUT_MS } from '../../constants/postmatch.constants';
+import {
+  LLM_ADAPTER_TIMEOUT_MS,
+  LLM_TEMPERATURE,
+  LLM_MAX_TOKENS,
+} from '../../constants/postmatch.constants';
+import { withTimeout } from '../../../../common/utils/timeout.util';
 
-/**
- * LLM adapter for Google Gemini.
- *
- * Each instance wraps a single API key.
- * Create multiple instances with different keys for key-rotation.
- */
 export class GeminiAdapter implements LlmAdapter {
   readonly name: string;
   private readonly model: GenerativeModel;
@@ -27,15 +26,24 @@ export class GeminiAdapter implements LlmAdapter {
     );
   }
 
+  /**
+   * Sends a prompt to Gemini and returns the generated explanation.
+   *
+   * @param prompt - The full prompt including the raw analysis data.
+   * @returns Generated text and the model name used.
+   * @throws Error if Gemini returns an empty response or times out.
+   */
   async explain(prompt: string): Promise<{ text: string; model: string }> {
-    const result = await this.withTimeout<GenerateContentResult>(
+    const result = await withTimeout<GenerateContentResult>(
       this.model.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 2048,
+          temperature: LLM_TEMPERATURE,
+          maxOutputTokens: LLM_MAX_TOKENS,
         },
       }),
+      LLM_ADAPTER_TIMEOUT_MS,
+      'Gemini request',
     );
 
     const text = result.response.text();
@@ -45,28 +53,5 @@ export class GeminiAdapter implements LlmAdapter {
     }
 
     return { text, model: this.modelName };
-  }
-
-  /** Enforces a hard timeout so fallback logic can move to the next adapter. */
-  private async withTimeout<T>(promise: Promise<T>): Promise<T> {
-    let timeoutHandle: NodeJS.Timeout | null = null;
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutHandle = setTimeout(() => {
-        reject(
-          new Error(
-            `Gemini request timed out after ${LLM_ADAPTER_TIMEOUT_MS}ms.`,
-          ),
-        );
-      }, LLM_ADAPTER_TIMEOUT_MS);
-    });
-
-    try {
-      return await Promise.race([promise, timeoutPromise]);
-    } finally {
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-      }
-    }
   }
 }

@@ -41,4 +41,11 @@ export const envValidationSchema = Joi.object({
 
   // --- Invitation Token ---
   INVITATION_TOKEN_TTL: Joi.string().required().default('15m'),
+
+  // --- Post-Match Analysis ---
+  AI_SERVICE_URL: Joi.string().uri().required(),
+  GEMINI_API_KEYS: Joi.string().optional(),
+  GEMINI_MODEL: Joi.string().optional().default('gemini-2.0-flash'),
+  GROQ_API_KEY: Joi.string().optional(),
+  GROQ_MODEL: Joi.string().optional().default('llama-3.1-8b-instant'),
 });

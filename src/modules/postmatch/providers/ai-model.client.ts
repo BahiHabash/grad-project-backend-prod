@@ -5,13 +5,10 @@ import { AI_CLIENT_TIMEOUT_MS } from '../constants/postmatch.constants';
 import { ConfigService } from '@nestjs/config';
 
 /**
- * HTTP client for the AI microservice.
+ * HTTP client for the AI analysis.
  *
- * Makes a POST request to AI_SERVICE_URL/analyze and returns the raw JSON.
- * This is the ONLY place that knows about the AI service URL.
- *
- * Plug-and-play: swap AI_SERVICE_URL in .env to switch
- * from mock to real AI service — zero code changes.
+ * Reads AI_SERVICE_URL from configuration and sends analysis requests.
+ * All failures are surfaced as BadGatewayException (HTTP 502).
  */
 @Injectable()
 export class AiModelClient {
@@ -34,12 +31,12 @@ export class AiModelClient {
   }
 
   /**
-   * Requests a post-match analysis from the AI microservice.
+   * Requests a post-match analysis from the AI service.
    *
    * @param eventId - SofaScore event/match ID.
-   * @param teamId  - SofaScore team ID to analyze for.
+   * @param teamId - SofaScore team ID to analyze for.
    * @returns The raw analysis JSON from the AI service.
-   * @throws {BadGatewayException} If the AI service is unreachable, times out,
+   * @throws BadGatewayException if the AI service is unreachable, times out,
    *         or returns a non-2xx status code.
    */
   async analyze(eventId: string, teamId: string): Promise<object> {
@@ -48,7 +45,7 @@ export class AiModelClient {
     );
 
     try {
-      const response = await this.httpClient.post<unknown>('/analyze', {
+      const response = await this.httpClient.post<unknown>('/post_match', {
         event_id: eventId,
         team_id: teamId,
       });
@@ -68,8 +65,10 @@ export class AiModelClient {
   }
 
   /**
-   * Translates axios errors into NestJS BadGatewayException.
-   * All AI client failures surface as 502 to the API consumer.
+   * Translates axios/unknown errors into BadGatewayException.
+   *
+   * @param error - The caught error from the HTTP call.
+   * @throws BadGatewayException always (return type is `never`).
    */
   private handleError(error: unknown): never {
     if (error instanceof BadGatewayException) {
@@ -114,6 +113,12 @@ export class AiModelClient {
     );
   }
 
+  /**
+   * Type guard that checks if a value is a non-null, non-array object.
+   *
+   * @param value - The value to check.
+   * @returns True if value is a plain object.
+   */
   private isObjectPayload(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }

@@ -11,8 +11,6 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-// ─── match_context ───────────────────────────────────────────────────────────
-
 class MatchContextDto {
   @IsString()
   @IsNotEmpty()
@@ -26,8 +24,6 @@ class MatchContextDto {
   @IsNotEmpty()
   team_formation: string;
 }
-
-// ─── players_analysis[] ──────────────────────────────────────────────────────
 
 class FatigueAndRiskDto {
   @IsNumber()
@@ -52,14 +48,13 @@ class PlayerAnalysisDto {
   position: string;
 
   @IsInt()
-  minutes_played: number;
+  @IsOptional()
+  minutes_played?: number;
 
   @ValidateNested()
   @Type(() => FatigueAndRiskDto)
   fatigue_and_risk: FatigueAndRiskDto;
 }
-
-// ─── trainingPlan ────────────────────────────────────────────────────────────
 
 class TeamDrillDto {
   @IsString()
@@ -96,22 +91,19 @@ class TrainingPlanDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TeamDrillDto)
-  teamDrills: TeamDrillDto[];
+  @IsOptional()
+  teamDrills?: TeamDrillDto[];
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => IndividualDrillDto)
-  individualDrills: IndividualDrillDto[];
+  @IsOptional()
+  individualDrills?: IndividualDrillDto[];
 }
 
-// ─── Root AI Response ────────────────────────────────────────────────────────
-
 /**
- * Validation DTO for the AI microservice response.
- *
- * Matches the EXACT contract agreed with the AI team.
- * Used by the service layer to validate the raw response
- * before storing or passing to the LLM.
+ * Validation DTO for the AI analysis response.
+ * Used to validate the raw response before storing or passing to the LLM.
  */
 export class AiAnalysisDto {
   @IsString()
@@ -140,5 +132,6 @@ export class AiAnalysisDto {
 
   @ValidateNested()
   @Type(() => TrainingPlanDto)
-  trainingPlan: TrainingPlanDto;
+  @IsOptional()
+  trainingPlan?: TrainingPlanDto;
 }

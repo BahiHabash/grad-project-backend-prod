@@ -12,7 +12,7 @@ import { ResponseMessage } from 'src/common/decorators/response-message.decorato
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import type { AccessTokenPayload } from '../auth/constants/token-payload.type';
 import { PostmatchService } from './postmatch.service';
-import { PostMatchReport } from './entities/postmatch-report.entity';
+import type { PostMatchReport } from './entities/postmatch-report.entity';
 import { AnalyzeMatchDto } from './dto/analyze-match.dto';
 import { ListReportsQueryDto } from './dto/postmatch-report.dto';
 
@@ -22,8 +22,13 @@ import { ListReportsQueryDto } from './dto/postmatch-report.dto';
 export class PostmatchController {
   constructor(private readonly postmatchService: PostmatchService) {}
 
-  // ─── 1. Trigger Analysis ──────────────────────────────────────────────
-
+  /**
+   * Triggers a post-match analysis for a given match and team.
+   *
+   * @param dto - Contains eventId and teamId.
+   * @param user - JWT payload with user ID and club ID.
+   * @returns The analysis report and a cached flag.
+   */
   @Post('analyze')
   @ApiOperation({
     summary: 'Trigger a post-match analysis',
@@ -45,8 +50,13 @@ export class PostmatchController {
     return this.toReportResponse(report, cached);
   }
 
-  // ─── 2. List Reports ─────────────────────────────────────────────────
-
+  /**
+   * Returns a paginated list of reports belonging to the user's club.
+   *
+   * @param query - Pagination parameters (page, limit).
+   * @param user - JWT payload with club ID.
+   * @returns Paginated list of report summaries.
+   */
   @Get('reports')
   @ApiOperation({
     summary: 'List post-match reports',
@@ -72,8 +82,13 @@ export class PostmatchController {
     };
   }
 
-  // ─── 3. Get Report by ID ─────────────────────────────────────────────
-
+  /**
+   * Retrieves a single report by ID with club-based access control.
+   *
+   * @param id - UUID of the report.
+   * @param user - JWT payload with club ID.
+   * @returns The full report including raw analysis and LLM explanation.
+   */
   @Get('reports/:id')
   @ApiOperation({
     summary: 'Get a specific post-match report',
@@ -89,8 +104,13 @@ export class PostmatchController {
     return this.toReportResponse(report, true);
   }
 
-  // ─── 4. Retry LLM Explanation ────────────────────────────────────────
-
+  /**
+   * Retries the LLM explanation for a PARTIAL report.
+   *
+   * @param id - UUID of the report to retry.
+   * @param user - JWT payload with club ID.
+   * @returns The updated report with a new LLM explanation.
+   */
   @Post('reports/:id/explain')
   @ApiOperation({
     summary: 'Retry LLM explanation for a partial report',
@@ -109,11 +129,12 @@ export class PostmatchController {
     return this.toReportResponse(report, false);
   }
 
-  // ─── Response Mappers ────────────────────────────────────────────────
-
   /**
    * Maps a PostMatchReport entity to the full API response shape.
-   * Single source of truth for the response contract.
+   *
+   * @param report - The report entity.
+   * @param cached - Whether the report was returned from cache.
+   * @returns Formatted response object.
    */
   private toReportResponse(report: PostMatchReport, cached: boolean) {
     return {
@@ -131,8 +152,10 @@ export class PostmatchController {
   }
 
   /**
-   * Maps a PostMatchReport entity to a lightweight summary
-   * (used in the paginated list endpoint).
+   * Maps a PostMatchReport entity to a lightweight summary for list endpoints.
+   *
+   * @param report - The report entity.
+   * @returns Summary object without raw analysis or LLM explanation.
    */
   private toReportSummary(report: PostMatchReport) {
     return {

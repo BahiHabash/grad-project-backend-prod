@@ -5,16 +5,15 @@
  * The LlmClient loops through adapters in order until one succeeds.
  */
 export interface LlmAdapter {
-  /** Human-readable identifier for logging (e.g. "gemini-key-1", "groq-key-1"). */
+  /** Human-readable identifier for logging. */
   readonly name: string;
 
   /**
    * Sends a prompt to the LLM and returns the generated text.
    *
    * @param prompt - The full prompt including the raw analysis data.
-   * @returns Generated explanation text with the exact model used.
-   * @throws Any error on failure (rate limit, timeout, network, etc.).
-   *         The LlmClient catches these and moves to the next adapter.
+   * @returns Generated explanation text with the model name used.
+   * @throws Any error on failure. The LlmClient catches and moves to the next adapter.
    */
   explain(prompt: string): Promise<{ text: string; model: string }>;
 }

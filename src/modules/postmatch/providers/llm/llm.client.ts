@@ -11,10 +11,7 @@ import { GroqAdapter } from './groq.adapter';
  * Orchestrates LLM calls across multiple adapters with automatic fallback.
  *
  * Adapter priority: Gemini keys (in order) → Groq key (fallback).
- * If ALL adapters fail, returns null (graceful degradation).
- *
- * The PostmatchService treats null as "LLM unavailable"
- * and sets report status to PARTIAL.
+ * Returns null if ALL adapters fail (graceful degradation).
  */
 @Injectable()
 export class LlmClient {
@@ -36,11 +33,11 @@ export class LlmClient {
   /**
    * Generates a human-readable explanation from a raw AI analysis.
    *
-   * Loops through all registered adapters. First success wins.
+   * Tries each adapter in order. First success wins.
    * Returns null if ALL adapters fail (never throws).
    *
    * @param rawAnalysis - The structured JSON from the AI service.
-   * @returns An object with { text, model } or null on failure.
+   * @returns Object with { text, model } or null on failure.
    */
   async explain(
     rawAnalysis: object,
@@ -72,18 +69,14 @@ export class LlmClient {
     return null;
   }
 
-  // ─── Private Helpers ────────────────────────────────────────────────────
-
   /**
    * Builds the ordered adapter chain from environment variables.
    *
-   * GEMINI_API_KEYS (comma-separated) → one GeminiAdapter per key.
-   * GROQ_API_KEY (single) → one GroqAdapter at the end.
+   * @returns Array of LLM adapters (Gemini first, Groq last).
    */
   private buildAdapterChain(): LlmAdapter[] {
     const adapters: LlmAdapter[] = [];
 
-    // --- Gemini adapters ---
     const geminiKeys = this.configService.get<string>('GEMINI_API_KEYS');
 
     if (geminiKeys) {
@@ -105,7 +98,6 @@ export class LlmClient {
       }
     }
 
-    // --- Groq adapter (fallback) ---
     const groqKey = this.configService.get<string>('GROQ_API_KEY');
     const groqModel = this.configService.get<string>('GROQ_MODEL');
 
@@ -124,6 +116,8 @@ export class LlmClient {
   /**
    * Loads the prompt template from the templates directory.
    * Falls back to an inline template if the file is not found.
+   *
+   * @returns The prompt template string with a {{RAW_ANALYSIS_JSON}} placeholder.
    */
   private loadPromptTemplate(): string {
     const templatePath = path.join(
@@ -161,6 +155,9 @@ export class LlmClient {
 
   /**
    * Injects the raw analysis JSON into the prompt template.
+   *
+   * @param rawAnalysis - The structured JSON from the AI service.
+   * @returns The complete prompt string.
    */
   private buildPrompt(rawAnalysis: object): string {
     return this.promptTemplate.replace(
@@ -169,6 +166,12 @@ export class LlmClient {
     );
   }
 
+  /**
+   * Safely extracts an error message from an unknown error.
+   *
+   * @param error - The caught error.
+   * @returns A string representation of the error.
+   */
   private formatError(error: unknown): string {
     if (error instanceof Error) {
       return error.message;

@@ -1,13 +1,16 @@
-import { Entity, PrimaryGeneratedColumn, Column, Index, Unique } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, Unique } from 'typeorm';
 
 @Entity('pre_match_analysis')
-@Unique('UQ_team', ['teamId', 'opponentId'])
+@Unique('UQ_team', ['club_id', 'sofa_score_team_id', 'opponentId'])
 export class PreMatchAnalysisEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'uuid' })
+  clubId: string;
 
   @Column()
-  teamId: number;
+  sofa_score_team_id: number;
 
   @Column()
   opponentId: number;
@@ -27,6 +30,6 @@ export class PreMatchAnalysisEntity {
   @Column({ type: 'jsonb' })
   opponentAnalysis: Record<string, any>;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp' })
   expiresAt: Date;
 }

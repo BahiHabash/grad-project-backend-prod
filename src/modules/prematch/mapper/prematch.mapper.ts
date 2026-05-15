@@ -6,7 +6,7 @@ export class PreMatchMapper {
   static toEntity(dto: PreMatchResDto): PreMatchAnalysisEntity {
     const entity = new PreMatchAnalysisEntity();
 
-    entity.teamId = dto.meta.teamId;
+    entity.sofa_score_team_id = dto.meta.teamId;
     entity.opponentId = dto.meta.opponentId;
     entity.matchDate = new Date(dto.meta.matchDate);
     entity.analysisTimestamp = new Date(dto.meta.analysisTimestamp);
@@ -21,7 +21,7 @@ export class PreMatchMapper {
   static toDto(entity: PreMatchAnalysisEntity): PreMatchResDto {
     return plainToInstance(PreMatchResDto, {
       meta: {
-        teamId: entity.teamId,
+        teamId: entity.sofa_score_team_id,
         opponentId: entity.opponentId,
         matchDate: entity.matchDate,
         analysisTimestamp: entity.analysisTimestamp,

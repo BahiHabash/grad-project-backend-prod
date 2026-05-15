@@ -55,7 +55,10 @@ export class SofaScoreProvider {
         `/teams/${teamId}/events/next/0`,
       );
 
-      const opponentId = data?.events?.[0]?.awayTeam?.id;
+      const opponentId =
+        teamId === data?.events?.[0]?.homeTeam?.id
+          ? data?.events?.[0]?.awayTeam?.id
+          : data?.events?.[0]?.homeTeam?.id;
 
       if (!opponentId) {
         this.logger.warn(

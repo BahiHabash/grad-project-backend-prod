@@ -30,6 +30,6 @@ export class PrematchController {
   async getPreMath(
     @CurrentUser('club_id') clubId: string,
   ): Promise<PreMatchResDto> {
-    return await this.prematchService.preMatchData(Number(clubId));
+    return await this.prematchService.preMatchData(clubId);
   }
 }

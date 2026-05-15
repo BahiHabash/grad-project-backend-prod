@@ -102,7 +102,6 @@ export class PrematchService {
         'Failed to save pre-match data',
         error instanceof Error ? error.message : String(error),
       );
-      console.log(error);
       throw new InternalServerErrorException(
         'Failed to persist pre-match analysis',
       );

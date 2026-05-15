@@ -696,4 +696,45 @@ export class AuthService {
     };
     this.eventEmitter.emit('auth.verificationEmail', eventParams);
   }
+
+  /**
+   * Logs out the user by revoking all refresh tokens and updating security timestamp.
+   * This effectively invalidates all existing sessions.
+   *
+   * @param userId - The ID of the user logging out.
+   */
+  async logout(userId: string): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Revoke ALL refresh tokens for this user
+      await queryRunner.manager.delete(AuthToken, {
+        user_id: userId,
+        type: AuthTokenType.REFRESH,
+      });
+
+      // 2. Update last_security_action_at to invalidate any issued JWTs
+      // that are checked against this timestamp (e.g. in refresh/guards)
+      await queryRunner.manager.update(User, userId, {
+        last_security_action_at: new Date(),
+      });
+
+      await queryRunner.commitTransaction();
+
+      this.eventEmitter.emit('security-update', {
+        user_id: userId,
+        action: 'logout',
+      });
+
+      this.logger.info('User logged out and sessions revoked', { userId });
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error('Logout failed', { userId });
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
 }

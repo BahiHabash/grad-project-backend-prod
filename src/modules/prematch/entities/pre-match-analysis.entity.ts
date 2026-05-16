@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, Unique } from 'typeorm';
 
 @Entity('pre_match_analysis')
-@Unique('UQ_team', ['club_id', 'sofa_score_team_id', 'opponentId'])
+@Unique('UQ_team', ['clubId', 'sofa_score_team_id', 'opponentId'])
 export class PreMatchAnalysisEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;

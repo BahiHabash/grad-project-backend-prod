@@ -63,18 +63,30 @@ export class UserController {
   @ApiOperation({ summary: 'Deactivate your account' })
   @ApiOkResponse({ description: 'Account deactivated' })
   @ResponseMessage('Account deactivated')
-  async deactivateAccount(@CurrentUser() user: AccessTokenPayload) {
+  async deactivateAccount(
+    @CurrentUser() user: AccessTokenPayload,
+  ): Promise<void> {
     await this.userService.deactivateAccount(user.id);
-    return null;
   }
 
   @Delete('me')
   @ApiOperation({ summary: 'Soft delete your account' })
   @ApiOkResponse({ description: 'Account soft deleted' })
   @ResponseMessage('Account deleted')
-  async softDeleteAccount(@CurrentUser() user: AccessTokenPayload) {
+  async softDeleteAccount(
+    @CurrentUser() user: AccessTokenPayload,
+  ): Promise<void> {
     await this.userService.softDeleteAccount(user.id);
-    return null;
+  }
+
+  @Delete('me/with-club')
+  @ApiOperation({ summary: 'Soft delete your account and your club' })
+  @ApiOkResponse({ description: 'Account and club soft deleted' })
+  @ResponseMessage('Account and club deleted')
+  async softDeleteAccountAndClub(
+    @CurrentUser() user: AccessTokenPayload,
+  ): Promise<void> {
+    await this.userService.softDeleteAccountAndClub(user.id);
   }
 
   @Get(':id')

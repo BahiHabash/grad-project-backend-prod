@@ -19,7 +19,7 @@ import { AuthTokenType } from '../../../src/modules/auth/constants/auth-token-ty
 import { SystemRole } from '../../../src/common/enums/system-role.enum';
 import { DataSource, type Repository, type QueryRunner } from 'typeorm';
 import * as passwordHash from '../../../src/utils/hash/password.hash';
-import type { User } from 'src/modules/user/entities/user.entity';
+import { User } from 'src/modules/user/entities/user.entity';
 
 // Mock password hash utils
 jest.mock('../../../src/utils/hash/password.hash', () => ({
@@ -84,6 +84,7 @@ describe('AuthService', () => {
         remove: jest.fn(),
         delete: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
     } as unknown as jest.Mocked<QueryRunner>;
 
@@ -538,6 +539,35 @@ describe('AuthService', () => {
       await expect(authService.changePassword('123', 'wrong')).rejects.toThrow(
         BadRequestException,
       );
+    });
+  });
+
+  describe('logout', () => {
+    it('should revoke all refresh tokens and update security action timestamp', async () => {
+      const userId = '123';
+      (mockQueryRunner.manager.delete as jest.Mock).mockResolvedValue({
+        affected: 1,
+      });
+      (mockQueryRunner.manager.update as jest.Mock).mockResolvedValue({
+        affected: 1,
+      });
+
+      await authService.logout(userId);
+
+      expect((mockQueryRunner.manager as any).delete).toHaveBeenCalledWith(
+        AuthToken,
+        {
+          user_id: userId,
+          type: AuthTokenType.REFRESH,
+        },
+      );
+      expect((mockQueryRunner.manager as any).update).toHaveBeenCalledWith(
+        User,
+        userId,
+        expect.any(Object),
+      );
+      expect((mockQueryRunner as any).commitTransaction).toHaveBeenCalled();
+      expect((mockQueryRunner as any).release).toHaveBeenCalled();
     });
   });
 });

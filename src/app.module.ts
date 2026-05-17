@@ -14,7 +14,6 @@ import { PrematchModule } from './modules/prematch/prematch.module';
 import { PostmatchModule } from './modules/postmatch/postmatch.module';
 import { StorageModule } from './modules/storage/storage.module';
 
-
 /**
  * The root module of the application and the starting point.
  *

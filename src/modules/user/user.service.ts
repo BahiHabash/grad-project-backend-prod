@@ -3,20 +3,40 @@ import {
   NotFoundException,
   InternalServerErrorException,
   BadRequestException,
+  ForbiddenException,
+  // Inject,
+  // forwardRef,
 } from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
-import { DataSource } from 'typeorm';
+import { DataSource, In, Not } from 'typeorm';
 import { AccountStatus } from '../../common/enums/account-status.enum';
 import { MemberRole } from '../../common/enums/member-role.enum';
 import { PinoLogger } from 'nestjs-pino';
 import { ClubStatus } from '../club/constants/club-status.enum';
 import { UserRepository } from './repositories/user.repository';
+import { FavoriteRepository } from './repositories/favorite.repository';
+import { UserSortField, SortOrder } from './dto/user-search.dto';
+import type {
+  UserSearchQueryDto,
+  UserSearchResultDto,
+} from './dto/user-search.dto';
+import { UserPublicProfileResDto } from './dto/user-public-profile.dto';
+import { SystemRole } from '../../common/enums/system-role.enum';
+import type { AccessTokenPayload } from '../auth/constants/token-payload.type';
+import { updateSecurityActionTime } from '../auth/helpers/security.helper';
+// import { EventEmitter2 } from '@nestjs/event-emitter';
+// import { AuthService } from '../auth/auth.service';
+// import { SecurityEvents } from '../../common/events/security.events';
 
 @Injectable()
 export class UserService {
   constructor(
     private readonly userRepository: UserRepository,
+    private readonly favoriteRepository: FavoriteRepository,
+    // @Inject(forwardRef(() => AuthService))
+    // private readonly eventEmitter: EventEmitter2,
+    // private readonly authService: AuthService,
     private readonly dataSource: DataSource,
     private readonly logger: PinoLogger,
   ) {}
@@ -32,10 +52,10 @@ export class UserService {
    * @throws NotFoundException if the user is not found.
    */
   async getProfile(userId: string): Promise<User> {
-    const user = await this.userRepository.internalRepo.findOne({
-      where: { id: userId, status: AccountStatus.ACTIVE },
-      relations: ['club'],
-      select: {
+    const user = await this.userRepository.findNotDeletedById(
+      userId,
+      { club: true },
+      {
         id: true,
         email: true,
         username: true,
@@ -55,7 +75,7 @@ export class UserService {
           status: true,
         },
       },
-    });
+    );
 
     if (!user) {
       throw new NotFoundException('User profile not found');
@@ -71,178 +91,81 @@ export class UserService {
    * @returns The updated user profile.
    * @throws NotFoundException if the user is not found.
    */
-  async updateProfile(userId: string, dto: UpdateUserDto): Promise<User> {
+  async updateProfile(
+    userId: string,
+    dto: UpdateUserDto,
+  ): Promise<Partial<UpdateUserDto>> {
     const user = await this.findOneByIdOrFail(userId);
 
+    const updatedFileds: Partial<UpdateUserDto> = {};
+
+    if (dto.first_name) updatedFileds.first_name = dto.first_name;
+    if (dto.last_name) updatedFileds.last_name = dto.last_name;
+    if (dto.profile_image_url)
+      updatedFileds.profile_image_url = dto.profile_image_url;
+
     // Update user profile
-    if (dto.first_name) user.first_name = dto.first_name;
-    if (dto.last_name) user.last_name = dto.last_name;
-    if (dto.profile_image_url) user.profile_image_url = dto.profile_image_url;
+    const updatedUser = await this.userRepository.internalRepo.update(
+      user.id,
+      updatedFileds,
+    );
 
-    return await this.userRepository.internalRepo.save(user);
-  }
-
-  /**
-   * Deactivates the account of the current user.
-   * @param userId The ID of the user to deactivate.
-   * @throws NotFoundException if the user is not found.
-   * @throws BadRequestException if the user is an owner of an active club.
-   */
-  async deactivateAccount(userId: string): Promise<void> {
-    const user = await this.userRepository.internalRepo.findOne({
-      where: { id: userId, status: AccountStatus.ACTIVE },
-      relations: ['club'],
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
+    if (updatedUser.affected === 0) {
+      throw new InternalServerErrorException('User profile not updated');
     }
 
-    // Owner cannot deactivate their account, transfer ownership first or delete the club.
-    if (
-      user.club?.owner_id === user.id &&
-      user.member_role === MemberRole.OWNER &&
-      user.club?.status === ClubStatus.ACTIVE
-    ) {
-      throw new BadRequestException(
-        'Owners cannot deactivate their accounts, transfer ownership first or delete the club.',
-      );
-    }
-
-    user.status = AccountStatus.DEACTIVATED;
-    user.last_security_action_at = new Date();
-
-    await this.userRepository.internalRepo.save(user);
-    this.logger.info(`User ${userId} deactivated their account`);
+    return updatedFileds;
   }
 
   /**
    * Soft deletes the account of the current user.
+   * Also soft-deletes all associated favorites within the same ACID transaction.
+   *
    * @param userId The ID of the user to soft delete.
    * @throws NotFoundException if the user is not found.
    * @throws BadRequestException if the user is an owner of an active club.
+   * @throws InternalServerErrorException if the soft deletion process fails.
    */
   async softDeleteAccount(userId: string): Promise<void> {
+    const user = await this.ensureUserCanBeDeletedOrThrow(userId);
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      const user = await queryRunner.manager.findOne(User, {
-        where: { id: userId },
-        relations: ['club'],
-      });
-
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      // Owner cannot delete their account, transfer ownership first or delete the club.
-      if (
-        user.club?.owner_id === user.id &&
-        user.member_role === MemberRole.OWNER &&
-        user.club?.status === ClubStatus.ACTIVE
-      ) {
-        throw new BadRequestException(
-          'Owners cannot delete their accounts, transfer ownership first or delete the club.',
-        );
-      }
-
       // update club membership so they leave the club upon soft delete
       user.club_id = null;
       user.member_role = null;
-      user.last_security_action_at = new Date();
+      user.last_security_action_at = updateSecurityActionTime();
 
       // We maintain the user row but change status and deleted_at
       user.status = AccountStatus.SOFT_DELETED;
 
-      // TypeORM soft remove
+      // Free up the email and username by anonymizing the soft-deleted record safely within varchar limits
+      this.anonymizeUserRecord(user);
+
+      // Save and soft-remove the user record using the transactional entity manager
       await queryRunner.manager.save(user);
       await queryRunner.manager.softRemove(user);
 
-      await queryRunner.commitTransaction();
-      this.logger.info(`User ${userId} soft-deleted their account`);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      this.logger.error(`Error soft-deleting user ${userId}`, error);
-      throw new InternalServerErrorException('Failed to delete account');
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  /**
-   * Soft deletes the account of the current user and their club.
-   * @param userId The ID of the user to soft delete.
-   * @throws NotFoundException if the user is not found.
-   * @throws BadRequestException if the user is not an owner or if the club has other active members.
-   */
-  async softDeleteAccountAndClub(userId: string): Promise<void> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const user = await queryRunner.manager.findOne(User, {
-        where: { id: userId },
-        relations: ['club', 'club.users'],
-      });
-
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      if (
-        user.club?.owner_id !== user.id ||
-        user.member_role !== MemberRole.OWNER
-      ) {
-        throw new BadRequestException(
-          'Only the club owner can delete the club along with their account.',
-        );
-      }
-
-      const club = user.club;
-
-      // Ensure no other members exist, or we require them to be removed first
-      const otherStaff = club.users.filter(
-        (u) => u.id !== user.id && u.status !== AccountStatus.SOFT_DELETED,
+      // Soft-delete all associated favorites using the FavoriteRepository within the transaction
+      await this.favoriteRepository.softDeleteByUserId(
+        userId,
+        queryRunner.manager,
       );
-
-      if (otherStaff.length > 0) {
-        throw new BadRequestException(
-          'Cannot delete club with active staff. Please remove all staff first or delegate ownership.',
-        );
-      }
-
-      // Soft delete club
-      club.status = ClubStatus.SOFT_DELETED;
-      await queryRunner.manager.save(club);
-      await queryRunner.manager.softRemove(club);
-
-      // Soft delete user and remove from club context
-      user.status = AccountStatus.SOFT_DELETED;
-      user.club_id = null;
-      user.member_role = null;
-
-      await queryRunner.manager.save(user);
-      await queryRunner.manager.softRemove(user);
 
       await queryRunner.commitTransaction();
       this.logger.info(
-        `User ${userId} soft-deleted their account and club ${club.id}`,
+        `User ${userId} and their favorites soft-deleted successfully`,
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(`Error soft-deleting user ${userId} and club`, error);
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      }
-      throw new InternalServerErrorException(
-        'Failed to delete account and club',
+      this.logger.error(
+        `Error soft-deleting user ${userId} and favorites`,
+        error,
       );
+      throw new InternalServerErrorException('Failed to delete account');
     } finally {
       await queryRunner.release();
     }
@@ -276,12 +199,28 @@ export class UserService {
    * @returns The user with the specified ID.
    * @throws NotFoundException if the user is not found.
    */
-  async findOneByIdOrFail(id: string): Promise<User> {
-    const user = await this.userRepository.findActiveById(id);
-    if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+  async findOneByIdOrFail(
+    id: string,
+    requester?: AccessTokenPayload,
+  ): Promise<UserPublicProfileResDto> {
+    const targetUser = await this.userRepository.findActiveById(id, {
+      club: true,
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException(`Invalid user ID: ${id}`);
     }
-    return user;
+
+    // Prevent a normal user from accessing or viewing an admin/non-user account
+    if (
+      requester &&
+      requester.sys_role === SystemRole.USER &&
+      targetUser.system_role !== SystemRole.USER
+    ) {
+      throw new ForbiddenException('You are not authorized to view this user');
+    }
+
+    return this.mapUserPublicProfile(targetUser);
   }
 
   /**
@@ -337,4 +276,266 @@ export class UserService {
       await queryRunner.release();
     }
   }
+
+  /**
+   * Searches for users based on email, status, and role with pagination.
+   *
+   * @param dto - The search filters and pagination parameters.
+   * @returns A paginated list of users and the total count.
+   */
+  async searchUsers(dto: UserSearchQueryDto): Promise<UserSearchResultDto> {
+    const {
+      page,
+      limit,
+      sortBy = UserSortField.CREATED_AT,
+      sortOrder = SortOrder.DESC,
+      ...filters
+    } = dto;
+
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.userRepository.internalRepo
+      .createQueryBuilder('user')
+      .where('user.status NOT IN (:...statuses)', {
+        statuses: [
+          AccountStatus.SOFT_DELETED,
+          AccountStatus.DEACTIVATED,
+          AccountStatus.BANNED,
+        ],
+      })
+      .select([
+        'user.id',
+        'user.email',
+        'user.username',
+        'user.first_name',
+        'user.last_name',
+        'user.status',
+        'user.system_role',
+        'user.member_role',
+        'user.created_at',
+      ]);
+
+    for (const [key, value] of Object.entries(filters)) {
+      if (value) {
+        let searchValue = value;
+        const likeSearchFields = ['email', 'username', 'club_name'];
+
+        if (likeSearchFields.includes(key)) {
+          searchValue = `%${value}%`;
+          queryBuilder.andWhere(`user.${key} ilike :${key}`, {
+            [key]: searchValue,
+          });
+        } else {
+          queryBuilder.andWhere(`user.${key} = :${key}`, {
+            [key]: searchValue,
+          });
+        }
+      }
+    }
+
+    // Secure whitelisted sort mapping
+    const sortMapping: Record<UserSortField, string> = {
+      [UserSortField.CREATED_AT]: 'user.created_at',
+      [UserSortField.EMAIL]: 'user.email',
+      [UserSortField.USERNAME]: 'user.username',
+    };
+
+    const orderColumn = sortMapping[sortBy] || 'user.created_at';
+    const orderDirection = sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
+
+    queryBuilder.orderBy(orderColumn, orderDirection);
+
+    // Apply stable tie-breaker sorting
+    if (orderColumn !== 'user.created_at') {
+      queryBuilder.addOrderBy('user.created_at', 'DESC');
+    }
+    queryBuilder.addOrderBy('user.id', 'ASC');
+
+    const [users, total] = await queryBuilder
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      users: users.map((user) => this.mapUserPublicProfile(user)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  /**
+   * @private
+   *
+   * Maps a user entity to a public profile response DTO.
+   * @param user - The user entity to map.
+   * @returns A public profile response DTO.
+   */
+  private mapUserPublicProfile(user: User): UserPublicProfileResDto {
+    return {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      club_id: user.club_id,
+      is_club_member: !!user.club_id,
+      profile_image_url: user.profile_image_url,
+      club: user.club,
+    };
+  }
+
+  /**
+   * @private
+   *
+   * Anonymizes a user's email and username to free them up for new registrations.
+   * @param user - The user entity to anonymize.
+   */
+  private anonymizeUserRecord(user: User): void {
+    user.original_email = user.email;
+    user.original_username = user.username;
+
+    const shortId = user.id.split('-')[0]; // first 8 chars of UUID
+    const timestamp = Date.now(); // short timestamp
+
+    user.username = `del_${shortId}_${timestamp}`;
+    user.email = `${user.username}@deleted.local`;
+  }
+
+  /**
+   * @private
+   *
+   * Ensures that a user can be safely deleted.
+   * Throws an error if the user is an owner of an active club with other staff.
+   * @param userId - The ID of the user to check.
+   * @returns The user entity if safe to delete.
+   * @throws NotFoundException if the user is not found.
+   * @throws BadRequestException if the user is an owner of an active club with other staff.
+   */
+  private async ensureUserCanBeDeletedOrThrow(userId: string): Promise<User> {
+    const user = await this.userRepository.internalRepo.findOne({
+      where: {
+        id: userId,
+        status: Not(In([AccountStatus.SOFT_DELETED, AccountStatus.BANNED])),
+      },
+      relations: ['club', 'club.users'],
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        first_name: true,
+        last_name: true,
+        status: true,
+        system_role: true,
+        member_role: true,
+        club_id: true,
+        last_security_action_at: true,
+        club: {
+          id: true,
+          owner_id: true,
+          status: true,
+          users: {
+            id: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (
+      user.member_role === MemberRole.OWNER &&
+      user.club &&
+      user.club?.owner_id === user.id &&
+      user.club?.status === ClubStatus.ACTIVE
+    ) {
+      const club = user.club;
+
+      // Ensure no other members exist, or we require them to be removed first
+      const otherStaff =
+        club.users?.filter(
+          (u) => u.id !== user.id && u.status !== AccountStatus.SOFT_DELETED,
+        ) ?? [];
+
+      if (otherStaff.length > 0) {
+        this.logger.error(
+          `User ${userId} is an owner of an active club with other members`,
+        );
+        throw new BadRequestException(
+          'You cannot delete your account because you are an owner of an active club with other members.',
+        );
+      }
+    }
+
+    return user;
+  }
+
+  /* TODO: Implement later */
+
+  // /**
+  //  * Deactivates the account of the current user.
+  //  * @param userId The ID of the user to deactivate.
+  //  * @throws NotFoundException if the user is not found.
+  //  * @throws BadRequestException if the user is an owner of an active club.
+  //  */
+  // async deactivateAccount(userId: string): Promise<void> {
+  //   const user = await this.userRepository.internalRepo.findOne({
+  //     where: { id: userId, status: AccountStatus.ACTIVE },
+  //     relations: ['club'],
+  //   });
+
+  //   if (!user) {
+  //     throw new NotFoundException('User not found');
+  //   }
+
+  //   // Owner cannot deactivate their account, transfer ownership first or delete the club.
+  //   if (
+  //     user.club?.owner_id === user.id &&
+  //     user.member_role === MemberRole.OWNER &&
+  //     user.club?.status === ClubStatus.ACTIVE
+  //   ) {
+  //     throw new BadRequestException(
+  //       'Owners cannot deactivate their accounts, transfer ownership first or delete the club.',
+  //     );
+  //   }
+
+  //   user.status = AccountStatus.DEACTIVATED;
+  //   user.last_security_action_at = updateSecurityActionTime();
+
+  //   this.eventEmitter.emit(SecurityEvents.USER_DEACTIVATED, { userId });
+
+  //   await this.userRepository.internalRepo.save(user);
+  //   this.logger.info(`User ${userId} deactivated their account`);
+
+  //   await this.authService.logout(userId);
+  // }
+
+  // /**
+  //  * Activates the account of the current user.
+  //  * @param userId The ID of the user to activate.
+  //  * @returns The updated user.
+  //  * @throws NotFoundException if the user is not found or not deactivated.
+  //  */
+  // async activateAccount(userId: string): Promise<User> {
+  //   const user = await this.userRepository.internalRepo.findOne({
+  //     where: { id: userId, status: AccountStatus.DEACTIVATED },
+  //   });
+
+  //   if (!user) {
+  //     throw new NotFoundException('Deactivated user not found');
+  //   }
+
+  //   user.status = AccountStatus.ACTIVE;
+  //   user.last_security_action_at = updateSecurityActionTime();
+
+  //   await this.userRepository.internalRepo.save(user);
+  //   this.logger.info(`User ${userId} reactivated their account`);
+
+  //   this.eventEmitter.emit(SecurityEvents.USER_ACTIVATED, { userId });
+
+  //   return user;
+  // }
 }

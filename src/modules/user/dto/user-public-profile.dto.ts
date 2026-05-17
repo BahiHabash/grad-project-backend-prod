@@ -1,8 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { AccountStatus } from '../../../common/enums/account-status.enum';
-import { SystemRole } from '../../../common/enums/system-role.enum';
-import { MemberRole } from '../../../common/enums/member-role.enum';
-import { ClubStatus } from '../../club/constants/club-status.enum';
 import { Expose, Type } from 'class-transformer';
 
 class ClubResDto {
@@ -21,13 +17,9 @@ class ClubResDto {
   @ApiProperty()
   @Expose()
   logo_url: string | null;
-
-  @ApiProperty({ enum: ClubStatus })
-  @Expose()
-  status: ClubStatus;
 }
 
-export class UserProfileResDto {
+export class UserPublicProfileResDto {
   @Expose()
   @ApiProperty()
   id: string;
@@ -49,30 +41,14 @@ export class UserProfileResDto {
   last_name: string | null;
 
   @Expose()
-  @ApiProperty()
-  is_verified: boolean;
-
-  @Expose()
-  @ApiProperty({ enum: AccountStatus })
-  status: AccountStatus;
+  @ApiProperty({ nullable: true })
+  club_id: string | null;
 
   @Expose()
   @ApiProperty()
   get is_club_member(): boolean {
     return !!this.club_id;
   }
-
-  @Expose()
-  @ApiProperty({ nullable: true })
-  club_id: string | null;
-
-  @Expose()
-  @ApiProperty({ enum: MemberRole, nullable: true })
-  member_role: MemberRole | null;
-
-  @Expose()
-  @ApiProperty({ enum: SystemRole })
-  system_role: SystemRole;
 
   @Expose()
   @ApiProperty({ nullable: true })

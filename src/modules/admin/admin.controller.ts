@@ -11,12 +11,16 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
+  ApiOkResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { PromoteUserDto } from './dtos/promote-user.dto';
 import { UpdateUserStatusDto } from './dtos/update-user-status.dto';
-import { UserSearchQueryDto } from './dtos/user-search-query.dto';
+import {
+  UserSearchQueryDto,
+  UserSearchResultDto,
+} from '../user/dto/user-search.dto';
 import { ClaimSearchQueryDto } from './dtos/claim-search-query.dto';
 import { SysRoles } from '../../common/decorators/roles.decorator';
 import { SystemRole } from '../../common/enums/system-role.enum';
@@ -43,7 +47,7 @@ export class AdminController {
    * @param requester - The currently authenticated admin/super-admin.
    * @param dto - The new role for the user.
    */
-  @Patch('users/:id/role')
+  @Patch('users/:id/promote')
   @ApiOperation({ summary: 'Promote a user to a new system role' })
   @ApiResponse({ status: 200, description: 'User role updated successfully.' })
   @ApiResponse({ status: 403, description: 'Forbidden - Hierarchy violation.' })
@@ -63,7 +67,9 @@ export class AdminController {
    * @param dto - The new status for the user.
    */
   @Patch('users/:id/status')
-  @ApiOperation({ summary: 'Update user account status (Ban/Activate)' })
+  @ApiOperation({
+    summary: 'Update user account status (Ban/Activate/Deactivate)',
+  })
   @ApiResponse({
     status: 200,
     description: 'User status updated successfully.',
@@ -83,9 +89,9 @@ export class AdminController {
    */
   @Get('users')
   @ApiOperation({ summary: 'Search and filter users' })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponse({
     description: 'List of users returned successfully.',
+    type: UserSearchResultDto,
   })
   async searchUsers(@Query() query: UserSearchQueryDto) {
     return this.adminService.searchUsers(query);
@@ -98,9 +104,9 @@ export class AdminController {
    */
   @Get('claims')
   @ApiOperation({ summary: 'Search and filter club ownership claims' })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponse({
     description: 'List of claims returned successfully.',
+    // type: ClaimSearchResultDto, // Note: Need to create this if it doesn't exist or use a generic one
   })
   async searchClaims(@Query() query: ClaimSearchQueryDto) {
     return this.adminService.searchClaims(query);
@@ -115,15 +121,10 @@ export class AdminController {
    */
   @Get('clubs')
   @ApiOperation({ summary: 'Search and filter clubs' })
-  @ApiResponse({
-    status: 200,
+  @ApiOkResponse({
     description: 'List of clubs returned successfully.',
   })
-  async searchClubs(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('name') name?: string,
-  ) {
-    return this.adminService.searchClubs(page, limit, name);
+  async searchClubs(@Body() dto: ClaimSearchQueryDto) {
+    return this.adminService.searchClubs(dto);
   }
 }

@@ -6,11 +6,12 @@ import { Claim } from './entities/claim.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { ClubRepository } from './repositories/club.repository';
+import { ClaimRepository } from './repositories/claim.repository';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Club, Claim])],
   controllers: [ClubController],
-  providers: [ClubService, ClubRepository],
-  exports: [ClubService, ClubRepository],
+  providers: [ClubService, ClubRepository, ClaimRepository],
+  exports: [ClubService, ClubRepository, ClaimRepository],
 })
 export class ClubModule {}

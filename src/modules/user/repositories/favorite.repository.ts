@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { Favorite } from '../entities/favorite.entity';
 import { BaseRepository } from '../../../common/repositories/base.repository';
 import { FavoriteTargetType } from '../../../common/enums/favorite-target-type.enum';
@@ -42,5 +42,24 @@ export class FavoriteRepository extends BaseRepository<Favorite> {
         sofa_score_target_id: targetId,
       },
     });
+  }
+
+  /**
+   * Soft deletes all favorites for a specific user.
+   * Supports execution within a transactional EntityManager to participate in ACID transactions.
+   *
+   * @param userId The ID of the user whose favorites should be soft deleted.
+   * @param transactionalManager Optional transactional EntityManager.
+   * @returns A promise that resolves when the soft-delete is complete.
+   */
+  async softDeleteByUserId(
+    userId: string,
+    transactionalManager?: EntityManager,
+  ): Promise<void> {
+    const repository = transactionalManager
+      ? transactionalManager.getRepository(Favorite)
+      : this.repo;
+
+    await repository.softDelete({ user_id: userId });
   }
 }

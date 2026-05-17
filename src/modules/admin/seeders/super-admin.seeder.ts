@@ -5,6 +5,7 @@ import { AccountStatus } from '../../../common/enums/account-status.enum';
 import { hashPassword } from '../../../utils/hash/password.hash';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { Logger } from '@nestjs/common';
+import { updateSecurityActionTime } from '../../auth/helpers/security.helper';
 
 /**
  * Standalone seeder script to bootstrap the initial SUPER_ADMIN user.
@@ -55,7 +56,7 @@ async function bootstrap() {
       system_role: SystemRole.SUPER_ADMIN,
       status: AccountStatus.ACTIVE,
       is_verified: true,
-      last_security_action_at: new Date(),
+      last_security_action_at: updateSecurityActionTime(),
     });
 
     logger.log(`Successfully bootstrapped SUPER_ADMIN: ${email}`);

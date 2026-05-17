@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminService } from '../../../src/modules/admin/admin.service';
 import { UserRepository } from '../../../src/modules/user/repositories/user.repository';
@@ -8,6 +9,7 @@ import { SystemRole } from '../../../src/common/enums/system-role.enum';
 import { AccountStatus } from '../../../src/common/enums/account-status.enum';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import type { AccessTokenPayload } from '../../../src/modules/auth/constants/token-payload.type';
+import { UserService } from '../../../src/modules/user/user.service';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -15,6 +17,7 @@ describe('AdminService', () => {
   let userRepository: any;
   let claimRepository: any;
   let clubRepository: any;
+  let userService: any;
 
   beforeEach(async () => {
     const mockQueryBuilder = {
@@ -53,6 +56,10 @@ describe('AdminService', () => {
         { provide: ClaimRepository, useValue: claimRepository },
         { provide: ClubRepository, useValue: clubRepository },
         {
+          provide: UserService,
+          useValue: { searchUsers: jest.fn() },
+        },
+        {
           provide: EventEmitter2,
           useValue: { emit: jest.fn() },
         },
@@ -61,6 +68,7 @@ describe('AdminService', () => {
 
     service = module.get<AdminService>(AdminService);
     eventEmitter = module.get(EventEmitter2);
+    userService = module.get(UserService);
   });
 
   it('should be defined', () => {
@@ -71,45 +79,74 @@ describe('AdminService', () => {
     const targetUserId = 'target-uuid';
 
     it('should throw ForbiddenException if an ADMIN tries to promote someone to ADMIN', async () => {
-      const requester = { id: 'admin-uuid', sys_role: SystemRole.ADMIN } as AccessTokenPayload;
-      
+      const requester = {
+        id: 'admin-uuid',
+        sys_role: SystemRole.ADMIN,
+      } as AccessTokenPayload;
+
       await expect(
-        service.promoteUser(requester, targetUserId, { role: SystemRole.ADMIN })
+        service.promoteUser(requester, targetUserId, {
+          role: SystemRole.ADMIN,
+        }),
       ).rejects.toThrow(ForbiddenException);
 
-      expect(eventEmitter.emit).toHaveBeenCalledWith('admin.security.violation', expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'admin.security-violation',
+        expect.any(Object),
+      );
     });
 
     it('should throw ForbiddenException if an ADMIN tries to promote someone to SUPER_ADMIN', async () => {
-      const requester = { id: 'admin-uuid', sys_role: SystemRole.ADMIN } as AccessTokenPayload;
-      
+      const requester = {
+        id: 'admin-uuid',
+        sys_role: SystemRole.ADMIN,
+      } as AccessTokenPayload;
+
       await expect(
-        service.promoteUser(requester, targetUserId, { role: SystemRole.SUPER_ADMIN })
+        service.promoteUser(requester, targetUserId, {
+          role: SystemRole.SUPER_ADMIN,
+        }),
       ).rejects.toThrow(ForbiddenException);
 
-      expect(eventEmitter.emit).toHaveBeenCalledWith('admin.security.violation', expect.any(Object));
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'admin.security-violation',
+        expect.any(Object),
+      );
     });
 
     it('should throw NotFoundException if user is not found during promotion', async () => {
-      const requester = { id: 'super-admin-uuid', sys_role: SystemRole.SUPER_ADMIN } as AccessTokenPayload;
+      const requester = {
+        id: 'super-admin-uuid',
+        sys_role: SystemRole.SUPER_ADMIN,
+      } as AccessTokenPayload;
       userRepository.internalRepo.update.mockResolvedValue({ affected: 0 });
 
       await expect(
-        service.promoteUser(requester, targetUserId, { role: SystemRole.REVIEWER })
+        service.promoteUser(requester, targetUserId, {
+          role: SystemRole.REVIEWER,
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should promote user successfully and emit event', async () => {
-      const requester = { id: 'super-admin-uuid', sys_role: SystemRole.SUPER_ADMIN } as AccessTokenPayload;
+      const requester = {
+        id: 'super-admin-uuid',
+        sys_role: SystemRole.SUPER_ADMIN,
+      } as AccessTokenPayload;
       userRepository.internalRepo.update.mockResolvedValue({ affected: 1 });
 
-      await service.promoteUser(requester, targetUserId, { role: SystemRole.ADMIN });
-
-      expect(userRepository.internalRepo.update).toHaveBeenCalledWith(targetUserId, {
-        system_role: SystemRole.ADMIN,
-        last_security_action_at: expect.any(Date),
+      await service.promoteUser(requester, targetUserId, {
+        role: SystemRole.ADMIN,
       });
-      expect(eventEmitter.emit).toHaveBeenCalledWith('admin.user.promoted', {
+
+      expect(userRepository.internalRepo.update).toHaveBeenCalledWith(
+        targetUserId,
+        {
+          system_role: SystemRole.ADMIN,
+          last_security_action_at: expect.any(Date),
+        },
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith('admin.promoted', {
         targetUserId,
         newRole: SystemRole.ADMIN,
         adminId: requester.id,
@@ -124,49 +161,71 @@ describe('AdminService', () => {
       userRepository.internalRepo.update.mockResolvedValue({ affected: 0 });
 
       await expect(
-        service.updateUserStatus(targetUserId, { status: AccountStatus.SUSPENDED })
+        service.updateUserStatus(targetUserId, {
+          status: AccountStatus.SOFT_DELETED,
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should update user status successfully and emit event', async () => {
       userRepository.internalRepo.update.mockResolvedValue({ affected: 1 });
 
-      await service.updateUserStatus(targetUserId, { status: AccountStatus.SUSPENDED });
-
-      expect(userRepository.internalRepo.update).toHaveBeenCalledWith(targetUserId, {
-        status: AccountStatus.SUSPENDED,
-        last_security_action_at: expect.any(Date),
+      await service.updateUserStatus(targetUserId, {
+        status: AccountStatus.SOFT_DELETED,
       });
-      expect(eventEmitter.emit).toHaveBeenCalledWith('admin.user.status_updated', {
+
+      expect(userRepository.internalRepo.update).toHaveBeenCalledWith(
         targetUserId,
-        newStatus: AccountStatus.SUSPENDED,
+        {
+          status: AccountStatus.SOFT_DELETED,
+          last_security_action_at: expect.any(Date),
+        },
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith('admin.status-updated', {
+        targetUserId,
+        newStatus: AccountStatus.SOFT_DELETED,
       });
     });
   });
 
   describe('searchUsers', () => {
     it('should return paginated users', async () => {
-      const result = await service.searchUsers({ page: 1, limit: 10, email: 'test' });
-      
-      expect(userRepository.internalRepo.createQueryBuilder).toHaveBeenCalledWith('user');
-      expect(result).toEqual({ users: [], total: 0, page: 1, limit: 10 });
+      const mockResult = { users: [], total: 0, page: 1, limit: 10 };
+      (userService.searchUsers as jest.Mock).mockResolvedValue(mockResult);
+
+      const result = await service.searchUsers({
+        page: 1,
+        limit: 10,
+        email: 'test',
+      });
+
+      expect(userService.searchUsers).toHaveBeenCalledWith({
+        page: 1,
+        limit: 10,
+        email: 'test',
+      });
+      expect(result).toEqual(mockResult);
     });
   });
 
   describe('searchClaims', () => {
     it('should return paginated claims', async () => {
       const result = await service.searchClaims({ page: 1, limit: 10 });
-      
-      expect(claimRepository.internalRepo.createQueryBuilder).toHaveBeenCalledWith('claim');
+
+      expect(
+        claimRepository.internalRepo.createQueryBuilder,
+      ).toHaveBeenCalledWith('claim');
       expect(result).toEqual({ claims: [], total: 0, page: 1, limit: 10 });
     });
   });
 
   describe('searchClubs', () => {
     it('should return paginated clubs', async () => {
-      const result = await service.searchClubs(1, 10, 'Test Club');
-      
-      expect(clubRepository.internalRepo.createQueryBuilder).toHaveBeenCalledWith('club');
+      const result = await service.searchClubs({ page: 1, limit: 10 });
+
+      expect(
+        clubRepository.internalRepo.createQueryBuilder,
+      ).toHaveBeenCalledWith('club');
       expect(result).toEqual({ clubs: [], total: 0, page: 1, limit: 10 });
     });
   });

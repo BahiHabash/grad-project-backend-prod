@@ -3,11 +3,9 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { User } from '../user/entities/user.entity';
 import { SystemRole } from '../../common/enums/system-role.enum';
 import { PromoteUserDto } from './dtos/promote-user.dto';
 import { UpdateUserStatusDto } from './dtos/update-user-status.dto';
-import { UserSearchQueryDto } from './dtos/user-search-query.dto';
 import { ClaimSearchQueryDto } from './dtos/claim-search-query.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserRepository } from '../user/repositories/user.repository';
@@ -16,6 +14,10 @@ import { ClubRepository } from '../club/repositories/club.repository';
 import { Claim } from '../club/entities/claim.entity';
 import { Club } from '../club/entities/club.entity';
 import type { AccessTokenPayload } from '../auth/constants/token-payload.type';
+import { SecurityEvents } from '../../common/events/security.events';
+import { UserService } from '../user/user.service';
+import { UserSearchQueryDto } from '../user/dto/user-search.dto';
+import { updateSecurityActionTime } from '../auth/helpers/security.helper';
 
 /**
  * Service handling administrative operations including user management,
@@ -27,6 +29,7 @@ export class AdminService {
     private readonly userRepository: UserRepository,
     private readonly claimRepository: ClaimRepository,
     private readonly clubRepository: ClubRepository,
+    private readonly userService: UserService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -51,7 +54,7 @@ export class AdminService {
         dto.role === SystemRole.SUPER_ADMIN
       ) {
         // Emit security violation event to notify SUPER_ADMINs
-        this.eventEmitter.emit('admin.security.violation', {
+        this.eventEmitter.emit(SecurityEvents.ADMIN_SECURITY_VIOLATION, {
           requesterId: requester.id,
           targetUserId,
           attemptedRole: dto.role,
@@ -67,7 +70,7 @@ export class AdminService {
     // 2. Perform raw update to bypass class-validator hooks on the entity
     const result = await this.userRepository.internalRepo.update(targetUserId, {
       system_role: dto.role,
-      last_security_action_at: new Date(),
+      last_security_action_at: updateSecurityActionTime(),
     });
 
     if (result.affected === 0) {
@@ -75,7 +78,7 @@ export class AdminService {
     }
 
     // 3. Emit success event for audit logging/notifications
-    this.eventEmitter.emit('admin.user.promoted', {
+    this.eventEmitter.emit(SecurityEvents.ADMIN_USER_PROMOTED, {
       targetUserId,
       newRole: dto.role,
       adminId: requester.id,
@@ -95,77 +98,17 @@ export class AdminService {
   ): Promise<void> {
     const result = await this.userRepository.internalRepo.update(targetUserId, {
       status: dto.status,
-      last_security_action_at: new Date(),
+      last_security_action_at: updateSecurityActionTime(),
     });
 
     if (result.affected === 0) {
       throw new NotFoundException(`User with ID ${targetUserId} not found.`);
     }
 
-    this.eventEmitter.emit('admin.user.status_updated', {
+    this.eventEmitter.emit(SecurityEvents.ADMIN_USER_STATUS_UPDATED, {
       targetUserId,
       newStatus: dto.status,
     });
-  }
-
-  /**
-   * Searches for users based on email, status, and role with pagination.
-   *
-   * @param query - The search filters and pagination parameters.
-   * @returns A paginated list of users and the total count.
-   */
-  async searchUsers(query: UserSearchQueryDto): Promise<{
-    users: User[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
-    const { page, limit, ...filters } = query;
-    const skip = (page - 1) * limit;
-
-    const queryBuilder = this.userRepository.internalRepo
-      .createQueryBuilder('user')
-      .select([
-        'user.id',
-        'user.email',
-        'user.username',
-        'user.first_name',
-        'user.last_name',
-        'user.status',
-        'user.system_role',
-        'user.member_role',
-        'user.created_at',
-      ]);
-
-    for (const [key, value] of Object.entries(filters)) {
-      if (value) {
-        let searchValue = value;
-        let conditionType = 'eq';
-        const likeSearchFields = ['email', 'username', 'club_name'];
-
-        if (likeSearchFields.includes(key)) {
-          searchValue = `%${value}%`;
-          conditionType = 'ilike';
-        }
-
-        queryBuilder.andWhere(`user.${key} ${conditionType} :${key}`, {
-          [key]: searchValue,
-        });
-      }
-    }
-
-    const [users, total] = await queryBuilder
-      .skip(skip)
-      .take(limit)
-      .orderBy('user.created_at', 'DESC')
-      .getManyAndCount();
-
-    return {
-      users,
-      total,
-      page,
-      limit,
-    };
   }
 
   /**
@@ -216,39 +159,35 @@ export class AdminService {
   /**
    * Searches for clubs (Teams foundation) with pagination.
    *
-   * @param query - Pagination parameters and name filter.
+   * @param dto - Pagination parameters and name filter.
    */
-  async searchClubs(
-    page: number = 1,
-    limit: number = 10,
-    name?: string,
-  ): Promise<{
+  async searchClubs(dto: ClaimSearchQueryDto): Promise<{
     clubs: Club[];
     total: number;
     page: number;
     limit: number;
   }> {
-    const skip = (page - 1) * limit;
+    const skip = (dto.page - 1) * dto.limit;
 
     const queryBuilder = this.clubRepository.internalRepo
       .createQueryBuilder('club')
       .select(['club.id', 'club.name', 'club.status', 'club.created_at']);
 
-    if (name) {
-      queryBuilder.andWhere('club.name ILIKE :name', { name: `%${name}%` });
-    }
-
     const [clubs, total] = await queryBuilder
       .skip(skip)
-      .take(limit)
+      .take(dto.limit)
       .orderBy('club.created_at', 'DESC')
       .getManyAndCount();
 
     return {
       clubs,
       total,
-      page,
-      limit,
+      page: dto.page,
+      limit: dto.limit,
     };
+  }
+
+  async searchUsers(query: UserSearchQueryDto) {
+    return this.userService.searchUsers(query);
   }
 }

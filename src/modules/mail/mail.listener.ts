@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { MailService } from './mail.service';
-import type { AuthEventsPayload } from '../auth/constants/auth-events-payload';
+import { AuthEventsPayload } from '../auth/constants/auth-events-payload';
 import { PinoLogger } from 'nestjs-pino';
+import { SecurityEvents } from '../../common/events/security.events';
 
 @Injectable()
 export class MailListener {
@@ -16,7 +17,7 @@ export class MailListener {
    *
    * @param payload AuthEventsPayload (e.g: url, email, username);
    */
-  @OnEvent('auth.verificationEmail', { async: true })
+  @OnEvent(SecurityEvents.EMAIL_VERIFICATION_REQUESTED, { async: true })
   async sendEmailVerificationdEventHandle(payload: AuthEventsPayload) {
     const { email, name, url } = payload;
     try {
@@ -33,7 +34,7 @@ export class MailListener {
    *
    * @param payload AuthEventsPayload (e.g: url, email, username);
    */
-  @OnEvent('auth.forgot-password', { async: true })
+  @OnEvent(SecurityEvents.PASSWORD_FORGOT, { async: true })
   async sendResetPasswordEventHandle(payload: AuthEventsPayload) {
     const { email, name, url } = payload;
     try {
@@ -45,7 +46,7 @@ export class MailListener {
     }
   }
 
-  @OnEvent('auth.change-password', { async: true })
+  @OnEvent(SecurityEvents.PASSWORD_CHANGED, { async: true })
   async sendChangePasswordEventHandle(payload: AuthEventsPayload) {
     const { email, name, url } = payload;
     try {

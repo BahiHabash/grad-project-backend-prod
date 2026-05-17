@@ -8,21 +8,25 @@ import {
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { AuthToken } from './entities/token.entity';
 import { User } from '../user/entities/user.entity';
 import { SignUpReqDto } from './dtos/sign-up.dto';
-import type { CreateTokenDto } from './dtos/create-token.dto';
 import { AuthTokenType } from './constants/auth-token-type.enum';
 import { AuthEventsPayload } from './constants/auth-events-payload';
 import { PinoLogger } from 'nestjs-pino';
 import { AuthTokenService } from './auth-token.service';
-import type { AccessTokenPayload } from './constants/token-payload.type';
 import { UserService } from '../user/user.service';
 import { AccountStatus } from '../../common/enums/account-status.enum';
-import type { AuthTokens } from './constants/auth-tokens.type';
 import { UserRepository } from '../user/repositories/user.repository';
 import { hashPassword, comparePassword } from '../../utils/hash/password.hash';
+import { SecurityEvents } from '../../common/events/security.events';
+import { updateSecurityActionTime } from './helpers/security.helper';
+import type { CreateTokenDto } from './dtos/create-token.dto';
+import type { AuthTokens } from './constants/auth-tokens.type';
+import type { AccessTokenPayload } from './constants/token-payload.type';
 
 type verificationTokens = {
   url: string;
@@ -50,6 +54,7 @@ export class AuthService {
     private readonly appConfig: AppConfig,
     private readonly logger: PinoLogger,
     private readonly tokenService: AuthTokenService,
+    @Inject(forwardRef(() => UserService))
     private readonly userService: UserService,
     private readonly dataSource: DataSource,
   ) {}
@@ -75,42 +80,15 @@ export class AuthService {
     // Check if user with the same email or username already exists
     const existingUser = await this.userRepository.internalRepo.findOne({
       where: [{ email: userData.email }, { username: userData.username }],
-      withDeleted: true,
     });
 
     if (existingUser) {
-      if (
-        existingUser.status === AccountStatus.SOFT_DELETED ||
-        existingUser.deleted_at !== null
-      ) {
-        this.logger.info(
-          'Anonymizing soft-deleted account to allow new registration:',
-          {
-            email: signUpDto.email,
-          },
-        );
-
-        // Free up the email and username by anonymizing the old soft-deleted record safely within varchar limits
-        existingUser.original_email = existingUser.email;
-        existingUser.original_username = existingUser.username;
-
-        const shortId = existingUser.id.split('-')[0]; // first 8 chars of UUID
-        const timestamp = Date.now().toString(36); // short timestamp
-
-        existingUser.username = `del_${shortId}_${timestamp}`;
-        existingUser.email = `${existingUser.username}@deleted.local`;
-
-        await this.userRepository.internalRepo.save(existingUser);
-
-        // Proceed to create a fresh new user below
+      if (existingUser.email === signUpDto.email) {
+        this.logger.error('Email already registered.');
+        throw new ConflictException('Email already registered.');
       } else {
-        if (existingUser.email === signUpDto.email) {
-          this.logger.error('Email already registered.');
-          throw new ConflictException('Email already registered.');
-        } else {
-          this.logger.error('Username is already taken.');
-          throw new ConflictException('Username is already taken.');
-        }
+        this.logger.error('Username is already taken.');
+        throw new ConflictException('Username is already taken.');
       }
     }
 
@@ -118,7 +96,7 @@ export class AuthService {
     const newUser = this.userRepository.internalRepo.create({
       ...userData,
       password_hash: await hashPassword(password),
-      last_security_action_at: new Date(),
+      last_security_action_at: updateSecurityActionTime(),
     });
 
     await this.userRepository.internalRepo.save(newUser);
@@ -251,12 +229,12 @@ export class AuthService {
 
       user.is_verified = true;
       user.status = AccountStatus.ACTIVE;
-      user.last_security_action_at = new Date();
+      user.last_security_action_at = updateSecurityActionTime();
       await queryRunner.manager.save(User, user);
 
       await queryRunner.commitTransaction();
 
-      this.eventEmitter.emit('security-update', {
+      this.eventEmitter.emit(SecurityEvents.EMAIL_VERIFIED, {
         user_id: user.id,
         action: 'email-verified',
       });
@@ -277,13 +255,11 @@ export class AuthService {
    * @throws {BadRequestException} If the user is invalid or already verified.
    */
   async requestEmailVerification(id: string): Promise<verificationTokens> {
-    const user = await this.userRepository.internalRepo.findOneBy({
-      id,
-      status: AccountStatus.PENDING_VERIFICATION,
-    });
+    const user = await this.userRepository.findNotDeletedNotBannedById(id);
 
-    if (!user)
-      throw new BadRequestException('Invalid user id or verification status.');
+    if (!user) throw new BadRequestException('Invalid user id.');
+    if (user.status === AccountStatus.BANNED)
+      throw new BadRequestException('User is banned.');
     if (user.is_verified)
       throw new BadRequestException('User is already verified.');
 
@@ -365,6 +341,7 @@ export class AuthService {
           user_id: user.id,
         },
       );
+
       throw new UnauthorizedException(
         'Session invalidated. Please log in again.',
       );
@@ -410,20 +387,15 @@ export class AuthService {
     userId: string,
     currentPassword: string,
   ): Promise<verificationTokens | void> {
-    const user: User | null = await this.userRepository.internalRepo.findOne({
-      where: {
-        id: userId,
-        status: Not(In([AccountStatus.SOFT_DELETED, AccountStatus.BANNED])),
-      },
-      select: {
+    const user: User | null =
+      await this.userRepository.findNotDeletedNotBannedById(userId, undefined, {
         password_hash: true,
         id: true,
         first_name: true,
         last_name: true,
         email: true,
         username: true,
-      },
-    });
+      });
 
     const isPassCorrect = await comparePassword(
       currentPassword,
@@ -451,7 +423,7 @@ export class AuthService {
       name: user.first_name || user.last_name || user.username,
     };
 
-    this.eventEmitter.emit('auth.change-password', eventParams);
+    this.eventEmitter.emit(SecurityEvents.PASSWORD_CHANGED, eventParams);
 
     return {
       url: resetPasswordUrl,
@@ -468,7 +440,8 @@ export class AuthService {
    * @returns A promise that resolves with void.
    */
   async forgotPassword(email: string): Promise<verificationTokens | void> {
-    const existingUser = await this.userRepository.findActiveByEmail(email);
+    const existingUser =
+      await this.userRepository.findNotDeletedNotBannedByEmail(email);
 
     if (!existingUser) return;
 
@@ -492,7 +465,7 @@ export class AuthService {
         existingUser.username,
     };
 
-    this.eventEmitter.emit('auth.forgot-password', eventParams);
+    this.eventEmitter.emit(SecurityEvents.PASSWORD_FORGOT, eventParams);
 
     return {
       url: resetPasswordUrl,
@@ -565,7 +538,7 @@ export class AuthService {
       });
 
       user.password_hash = await hashPassword(newPassword);
-      user.last_security_action_at = new Date();
+      user.last_security_action_at = updateSecurityActionTime();
       await queryRunner.manager.save(User, user);
 
       // Issue new refresh token inside the transaction.
@@ -580,7 +553,7 @@ export class AuthService {
         this.buildAccessPayload(user),
       );
 
-      this.eventEmitter.emit('security-update', {
+      this.eventEmitter.emit(SecurityEvents.USER_SECURITY_UPDATE, {
         user_id: user.id,
         action: 'password-reset',
       });
@@ -694,7 +667,10 @@ export class AuthService {
       email: user.email,
       name: user.first_name || user.last_name || user.username,
     };
-    this.eventEmitter.emit('auth.verificationEmail', eventParams);
+    this.eventEmitter.emit(
+      SecurityEvents.EMAIL_VERIFICATION_REQUESTED,
+      eventParams,
+    );
   }
 
   /**
@@ -718,12 +694,12 @@ export class AuthService {
       // 2. Update last_security_action_at to invalidate any issued JWTs
       // that are checked against this timestamp (e.g. in refresh/guards)
       await queryRunner.manager.update(User, userId, {
-        last_security_action_at: new Date(),
+        last_security_action_at: updateSecurityActionTime(),
       });
 
       await queryRunner.commitTransaction();
 
-      this.eventEmitter.emit('security-update', {
+      this.eventEmitter.emit(SecurityEvents.LOGOUT, {
         user_id: userId,
         action: 'logout',
       });

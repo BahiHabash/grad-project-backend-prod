@@ -19,7 +19,7 @@ import { AuthTokenType } from '../../../src/modules/auth/constants/auth-token-ty
 import { SystemRole } from '../../../src/common/enums/system-role.enum';
 import { DataSource, type Repository, type QueryRunner } from 'typeorm';
 import * as passwordHash from '../../../src/utils/hash/password.hash';
-import { User } from 'src/modules/user/entities/user.entity';
+import { User } from '../../../src/modules/user/entities/user.entity';
 
 // Mock password hash utils
 jest.mock('../../../src/utils/hash/password.hash', () => ({
@@ -52,9 +52,10 @@ describe('AuthService', () => {
   let tokenRepo: jest.Mocked<Repository<AuthToken>>;
   let eventEmitter: jest.Mocked<EventEmitter2>;
   let tokenService: jest.Mocked<AuthTokenService>;
-  let userService: jest.Mocked<UserService>;
   let mockInternalRepo: jest.Mocked<Repository<User>>;
   let mockQueryRunner: jest.Mocked<QueryRunner>;
+  let userRepository: any;
+  let userService: jest.Mocked<UserService>;
 
   beforeEach(async () => {
     mockInternalRepo = {
@@ -102,6 +103,8 @@ describe('AuthService', () => {
       findActiveByEmail: jest.fn(),
       findNotDeletedById: jest.fn(),
       findActiveById: jest.fn(),
+      findNotDeletedNotBannedById: jest.fn(),
+      findNotDeletedNotBannedByEmail: jest.fn(),
     };
 
     const mockTokenRepo = {
@@ -156,6 +159,7 @@ describe('AuthService', () => {
     eventEmitter = module.get(EventEmitter2);
     tokenService = module.get(AuthTokenService);
     userService = module.get(UserService);
+    userRepository = mockUserRepository;
   });
 
   afterEach(() => {
@@ -184,37 +188,6 @@ describe('AuthService', () => {
       await expect(authService.signUp(signUpDto)).rejects.toThrow(
         ConflictException,
       );
-    });
-
-    it('should anonymize old user and create a new one if existing user is SOFT_DELETED', async () => {
-      const softDeletedUser = {
-        id: 'mock-uuid-1234',
-        email: 'test@example.com',
-        username: 'testuser',
-        status: AccountStatus.SOFT_DELETED,
-        deleted_at: new Date(),
-        original_email: null,
-        original_username: null,
-      } as User;
-
-      const newUser = {
-        id: 'new-uuid-5678',
-        email: 'test@example.com',
-        username: 'testuser',
-        status: AccountStatus.PENDING_VERIFICATION,
-        system_role: SystemRole.USER,
-      } as User;
-
-      mockInternalRepo.findOne.mockResolvedValue(softDeletedUser);
-      mockInternalRepo.create.mockReturnValue(newUser);
-      mockInternalRepo.save.mockResolvedValue(newUser);
-
-      const result = await authService.signUp(signUpDto);
-
-      expect((mockInternalRepo as any).save).toHaveBeenCalledTimes(2);
-      expect(softDeletedUser.original_email).toBe('test@example.com');
-      expect(softDeletedUser.username).toContain('del_mock');
-      expect(result.accessToken).toBe('access_token_mock');
     });
 
     it('should create a new user successfully if no existing user found', async () => {
@@ -360,7 +333,7 @@ describe('AuthService', () => {
         is_verified: false,
         status: AccountStatus.PENDING_VERIFICATION,
       } as User;
-      mockInternalRepo.findOneBy.mockResolvedValue(mockUser);
+      userRepository.findNotDeletedNotBannedById.mockResolvedValue(mockUser);
 
       await authService.requestEmailVerification('123');
 
@@ -375,7 +348,7 @@ describe('AuthService', () => {
     });
 
     it('should throw BadRequestException if user is verified', async () => {
-      mockInternalRepo.findOneBy.mockResolvedValue({
+      userRepository.findNotDeletedNotBannedById.mockResolvedValue({
         id: '123',
         is_verified: true,
       } as User);
@@ -517,20 +490,20 @@ describe('AuthService', () => {
         password_hash: 'hashed',
         email: 'test@example.com',
       } as User;
-      mockInternalRepo.findOne.mockResolvedValue(mockUser);
+      userRepository.findNotDeletedNotBannedById.mockResolvedValue(mockUser);
       (passwordHash.comparePassword as jest.Mock).mockResolvedValue(true);
 
       const result = await authService.changePassword('123', 'correct');
 
       expect(eventEmitter.emit as jest.Mock).toHaveBeenCalledWith(
-        'auth.change-password',
+        'auth.password-changed',
         expect.any(Object),
       );
       expect(result).toBeDefined();
     });
 
     it('should throw BadRequestException if current password wrong', async () => {
-      mockInternalRepo.findOne.mockResolvedValue({
+      userRepository.findNotDeletedNotBannedById.mockResolvedValue({
         id: '123',
         password_hash: 'hashed',
       } as User);

@@ -24,6 +24,14 @@ import { BaseEntity } from '../../../common/entities/base.entity';
  */
 @Entity('users')
 export class User extends BaseEntity {
+  // store original email if the user was soft-deleted
+  @Column({ type: 'varchar', length: 70, nullable: true })
+  original_email: string | null;
+
+  // store original username if the user was soft-deleted
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  original_username: string | null;
+
   @Column({ type: 'varchar', length: 70, unique: true })
   email: string;
 

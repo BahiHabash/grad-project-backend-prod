@@ -80,6 +80,6 @@ export class UserProfileResDto {
 
   @Expose()
   @Type(() => ClubResDto)
-  @ApiProperty({ type: ClubResDto, required: false })
-  club?: ClubResDto;
+  @ApiProperty({ type: ClubResDto, required: false, nullable: true })
+  club: ClubResDto | null;
 }

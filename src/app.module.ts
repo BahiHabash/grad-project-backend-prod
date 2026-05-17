@@ -5,6 +5,7 @@ import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ClubModule } from './modules/club/club.module';
 import { InvitationModule } from './modules/invitation/invitation.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { TransformResponseInterceptor } from './common/interceptor/transform.interceptor';
@@ -13,7 +14,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt.guard';
 import { PrematchModule } from './modules/prematch/prematch.module';
 import { PostmatchModule } from './modules/postmatch/postmatch.module';
 import { StorageModule } from './modules/storage/storage.module';
-
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 /**
  * The root module of the application and the starting point.
@@ -28,9 +29,11 @@ import { StorageModule } from './modules/storage/storage.module';
     AuthModule,
     ClubModule,
     InvitationModule,
+    AdminModule,
     PrematchModule,
     PostmatchModule,
     StorageModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [

@@ -14,6 +14,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt.guard';
 import { PrematchModule } from './modules/prematch/prematch.module';
 import { PostmatchModule } from './modules/postmatch/postmatch.module';
 import { StorageModule } from './modules/storage/storage.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 /**
  * The root module of the application and the starting point.
@@ -32,6 +33,7 @@ import { StorageModule } from './modules/storage/storage.module';
     PrematchModule,
     PostmatchModule,
     StorageModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [

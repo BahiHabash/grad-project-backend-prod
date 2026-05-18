@@ -2,7 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminService } from '../../../src/modules/admin/admin.service';
 import { UserRepository } from '../../../src/modules/user/repositories/user.repository';
-import { ClaimRepository } from '../../../src/modules/club/repositories/claim.repository';
+import { ClaimRepository } from '../../../src/modules/club-claim/repositories/claim.repository';
 import { ClubRepository } from '../../../src/modules/club/repositories/club.repository';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SystemRole } from '../../../src/common/enums/system-role.enum';

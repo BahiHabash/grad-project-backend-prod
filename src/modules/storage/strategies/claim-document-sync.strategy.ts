@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { StorageSyncStrategy } from '../interfaces/storage-sync-strategy.interface';
-import { ClaimRepository } from '../../club/repositories/claim.repository';
-import { Claim } from '../../club/entities/claim.entity';
+import { ClaimRepository } from '../../club-claim/repositories/claim.repository';
+import { Claim } from '../../club-claim/entities/claim.entity';
 
 /**
  * Strategy implementation to synchronize verification document URLs for onboarding claims.

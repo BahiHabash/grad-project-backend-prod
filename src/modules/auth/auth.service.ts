@@ -27,6 +27,7 @@ import { updateSecurityActionTime } from './helpers/security.helper';
 import type { CreateTokenDto } from './dtos/create-token.dto';
 import type { AuthTokens } from './constants/auth-tokens.type';
 import type { AccessTokenPayload } from './constants/token-payload.type';
+import { MemberRole } from '../../common/enums/member-role.enum';
 
 type verificationTokens = {
   url: string;
@@ -631,7 +632,7 @@ export class AuthService {
     const api: string = this.appConfig.apiPrefix;
 
     // BUG should be the frontend url
-    // e.g: http://localhost:3000/api/v1/auth/verify-email?token=...
+    // e.g: http://localhost:3000/auth/verify-email?token=...
     const url: string = `${baseUrl}/${api}/${route}?token=${token}`;
 
     return url;
@@ -651,7 +652,7 @@ export class AuthService {
       status: user.status,
       sys_role: user.system_role,
       club_id: user.club_id || null,
-      mem_role: user.member_role || undefined,
+      mem_role: user.member_role || MemberRole.NONE,
     };
   }
 

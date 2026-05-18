@@ -67,8 +67,8 @@ export class User extends BaseEntity {
   @JoinColumn({ name: 'club_id' })
   club: Club | null;
 
-  @Column({ type: 'enum', enum: MemberRole, nullable: true })
-  member_role: MemberRole | null;
+  @Column({ type: 'enum', enum: MemberRole, default: MemberRole.NONE })
+  member_role: MemberRole;
 
   @Column({
     type: 'enum',

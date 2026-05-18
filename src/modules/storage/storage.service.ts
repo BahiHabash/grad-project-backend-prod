@@ -7,17 +7,17 @@ import * as crypto from 'crypto';
 import { StorageSignatureReqDto } from './dto/storage-signature-req.dto';
 import { StorageSignatureResDto } from './dto/storage-signature-res.dto';
 import { StorageConfirmReqDto } from './dto/storage-confirm-req.dto';
+import { StorageConfirmResDto } from './dto/storage-confirm-res.dto';
 import { StorageFilePurpose } from '../../common/enums/storage-file-purpose.enum';
 import { StorageFileRepository } from './repositories/storage-file.repository';
 import { UserRepository } from '../user/repositories/user.repository';
 import { ClubRepository } from '../club/repositories/club.repository';
-import { ClaimRepository } from '../club/repositories/claim.repository';
+import { ClaimRepository } from '../club-claim/repositories/claim.repository';
 import { AccessTokenPayload } from '../auth/constants/token-payload.type';
 import { SystemRole } from '../../common/enums/system-role.enum';
-import { StorageFile } from './entities/storage-file.entity';
 import { User } from '../user/entities/user.entity';
 import { Club } from '../club/entities/club.entity';
-import { Claim } from '../club/entities/claim.entity';
+import { Claim } from '../club-claim/entities/claim.entity';
 import { CloudinaryConfig } from '../../core/config/configrations';
 import { getCloudinaryFolder } from '../../common/utils/storage.util';
 import { StorageSyncStrategy } from './interfaces/storage-sync-strategy.interface';
@@ -68,7 +68,7 @@ export class StorageService {
     const { purpose, entityId } = query;
 
     // 1. Enforce business entity access controls
-    await this.validateEntityAccess(user, purpose, entityId);
+    if (entityId) await this.validateEntityAccess(user, purpose, entityId);
 
     // 2. Resolve Cloudinary credentials from configuration class
     const { apiKey, apiSecret, cloudName, overWrite } = this.cloudinaryConfig;
@@ -79,7 +79,7 @@ export class StorageService {
     // 4. Generate a semantic public_id using entity ID, purpose, and timestamp
     const timestamp = Math.round(Date.now() / 1000);
     const purposeSnake = purpose.toLowerCase().replace(/_/g, '_');
-    const publicId = `${entityId}_${purposeSnake}_${timestamp}`;
+    const publicId = `${entityId || 'temp'}_${purposeSnake}_${timestamp}`;
 
     // 5. Build parameter set to sign alphabetically
     const paramsToSign = {
@@ -116,11 +116,7 @@ export class StorageService {
   async confirmUpload(
     user: AccessTokenPayload,
     body: StorageConfirmReqDto,
-  ): Promise<{
-    success: boolean;
-    message: string;
-    data: { file: StorageFile; entity: User | Club | Claim };
-  }> {
+  ): Promise<StorageConfirmResDto> {
     const {
       purpose,
       entityId,
@@ -132,7 +128,7 @@ export class StorageService {
     } = body;
 
     // 1. Enforce business entity access controls
-    await this.validateEntityAccess(user, purpose, entityId);
+    if (entityId) await this.validateEntityAccess(user, purpose, entityId);
 
     // 1b. Enforce signature timeframe expiration (e.g. 5 minutes / 300 seconds)
     const parts = public_id.split('_');
@@ -161,9 +157,12 @@ export class StorageService {
       );
     }
 
-    // 2. Synchronize database row based on purpose using Strategy Pattern
-    const strategy = this.strategies[purpose];
-    const updatedEntity = await strategy.sync(entityId, secure_url);
+    // 2. Synchronize database row based on purpose using Strategy Pattern if entityId is present
+    let updatedEntity: User | Club | Claim | null = null;
+    if (entityId) {
+      const strategy = this.strategies[purpose];
+      updatedEntity = await strategy.sync(entityId, secure_url);
+    }
 
     // 3. Create a persistent StorageFile transaction log
     const isSensitive = purpose === StorageFilePurpose.CLAIM_DOCUMENT;
@@ -180,12 +179,8 @@ export class StorageService {
     const savedFile = await this.storageFileRepository.save(storageFile);
 
     return {
-      success: true,
-      message: 'Upload confirmed and synchronized successfully.',
-      data: {
-        file: savedFile,
-        entity: updatedEntity,
-      },
+      file: savedFile,
+      entity: updatedEntity,
     };
   }
 

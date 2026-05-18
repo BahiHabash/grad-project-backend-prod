@@ -8,7 +8,7 @@ import { StorageService } from '../../../src/modules/storage/storage.service';
 import { StorageFileRepository } from '../../../src/modules/storage/repositories/storage-file.repository';
 import { UserRepository } from '../../../src/modules/user/repositories/user.repository';
 import { ClubRepository } from '../../../src/modules/club/repositories/club.repository';
-import { ClaimRepository } from '../../../src/modules/club/repositories/claim.repository';
+import { ClaimRepository } from '../../../src/modules/club-claim/repositories/claim.repository';
 import { CloudinaryConfig } from '../../../src/core/config/configrations';
 import { StorageFilePurpose } from '../../../src/common/enums/storage-file-purpose.enum';
 import { SystemRole } from '../../../src/common/enums/system-role.enum';
@@ -17,7 +17,8 @@ import { StorageSignatureReqDto } from '../../../src/modules/storage/dto/storage
 import { StorageConfirmReqDto } from '../../../src/modules/storage/dto/storage-confirm-req.dto';
 import { User } from '../../../src/modules/user/entities/user.entity';
 import { Club } from '../../../src/modules/club/entities/club.entity';
-import { Claim } from '../../../src/modules/club/entities/claim.entity';
+import { Claim } from '../../../src/modules/club-claim/entities/claim.entity';
+import { MemberRole } from 'src/common/enums/member-role.enum';
 
 interface MockRepository {
   internalRepo: {
@@ -111,7 +112,7 @@ describe('StorageService', () => {
       status: 'ACTIVE',
       sys_role: SystemRole.USER,
       club_id: 'club-uuid-123',
-      mem_role: undefined,
+      mem_role: MemberRole.NONE,
     };
 
     it('should generate signature and dynamic upload URL successfully (Happy Path)', async () => {
@@ -152,7 +153,7 @@ describe('StorageService', () => {
         status: 'ACTIVE',
         sys_role: SystemRole.ADMIN,
         club_id: null,
-        mem_role: undefined,
+        mem_role: MemberRole.NONE,
       };
 
       const query: StorageSignatureReqDto = {
@@ -173,7 +174,7 @@ describe('StorageService', () => {
       status: 'ACTIVE',
       sys_role: SystemRole.USER,
       club_id: 'club-uuid-123',
-      mem_role: undefined,
+      mem_role: MemberRole.NONE,
     };
 
     it('should sync user avatar and save storage file log successfully using Strategy Pattern', async () => {
@@ -196,11 +197,7 @@ describe('StorageService', () => {
 
       const result = await service.confirmUpload(user, body);
 
-      expect(result.success).toBe(true);
-      expect(result.message).toBe(
-        'Upload confirmed and synchronized successfully.',
-      );
-      expect((result.data.entity as User).profile_image_url).toBe(
+      expect((result.entity as User).profile_image_url).toBe(
         'https://cloudinary.com/image.jpg',
       );
       expect(userRepositoryMock.internalRepo.save).toHaveBeenCalled();
@@ -233,8 +230,7 @@ describe('StorageService', () => {
 
       const result = await service.confirmUpload(user, body);
 
-      expect(result.success).toBe(true);
-      expect((result.data.entity as Club).logo_url).toBe(
+      expect((result.entity as Club).logo_url).toBe(
         'https://cloudinary.com/logo.jpg',
       );
       expect(clubRepositoryMock.internalRepo.save).toHaveBeenCalled();
@@ -260,8 +256,7 @@ describe('StorageService', () => {
 
       const result = await service.confirmUpload(user, body);
 
-      expect(result.success).toBe(true);
-      expect((result.data.entity as Claim).document_urls).toContain(
+      expect((result.entity as Claim).document_urls).toContain(
         'https://cloudinary.com/doc.pdf',
       );
       expect(claimRepositoryMock.internalRepo.save).toHaveBeenCalled();
@@ -269,6 +264,28 @@ describe('StorageService', () => {
       expect(storageFileRepositoryMock.save).toHaveBeenCalledWith(
         expect.objectContaining({
           purpose: StorageFilePurpose.CLAIM_DOCUMENT,
+          public_url: null,
+        }),
+      );
+    });
+
+    it('should skip synchronization and save file transaction log if entityId is not provided', async () => {
+      const body: StorageConfirmReqDto = {
+        purpose: StorageFilePurpose.CLAIM_DOCUMENT,
+        public_id: 'mock-public-id-doc-no-entity',
+        secure_url: 'https://cloudinary.com/doc.pdf',
+        original_name: 'doc.pdf',
+        mime_type: 'application/pdf',
+        size_bytes: 4096,
+      };
+
+      const result = await service.confirmUpload(user, body);
+
+      expect(result.entity).toBeNull();
+      expect(storageFileRepositoryMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          purpose: StorageFilePurpose.CLAIM_DOCUMENT,
+          file_key: 'mock-public-id-doc-no-entity',
           public_url: null,
         }),
       );

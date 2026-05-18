@@ -1,6 +1,6 @@
 import { User } from '../../user/entities/user.entity';
 import { Club } from '../../club/entities/club.entity';
-import { Claim } from '../../club/entities/claim.entity';
+import { Claim } from '../../club-claim/entities/claim.entity';
 
 /**
  * Strategy interface for synchronizing database entities with uploaded storage assets.

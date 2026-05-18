@@ -275,6 +275,29 @@ describe('StorageService', () => {
       );
     });
 
+    it('should skip synchronization and save file transaction log if entityId is not provided', async () => {
+      const body: StorageConfirmReqDto = {
+        purpose: StorageFilePurpose.CLAIM_DOCUMENT,
+        public_id: 'mock-public-id-doc-no-entity',
+        secure_url: 'https://cloudinary.com/doc.pdf',
+        original_name: 'doc.pdf',
+        mime_type: 'application/pdf',
+        size_bytes: 4096,
+      };
+
+      const result = await service.confirmUpload(user, body);
+
+      expect(result.success).toBe(true);
+      expect(result.data.entity).toBeNull();
+      expect(storageFileRepositoryMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          purpose: StorageFilePurpose.CLAIM_DOCUMENT,
+          file_key: 'mock-public-id-doc-no-entity',
+          public_url: null,
+        }),
+      );
+    });
+
     it('should throw NotFoundException if synchronization target is not found', async () => {
       userRepositoryMock.internalRepo.findOne.mockResolvedValue(null);
 

@@ -119,7 +119,7 @@ export class StorageService {
   ): Promise<{
     success: boolean;
     message: string;
-    data: { file: StorageFile; entity: User | Club | Claim };
+    data: { file: StorageFile; entity: User | Club | Claim | null };
   }> {
     const {
       purpose,
@@ -161,9 +161,12 @@ export class StorageService {
       );
     }
 
-    // 2. Synchronize database row based on purpose using Strategy Pattern
-    const strategy = this.strategies[purpose];
-    const updatedEntity = await strategy.sync(entityId, secure_url);
+    // 2. Synchronize database row based on purpose using Strategy Pattern if entityId is present
+    let updatedEntity: User | Club | Claim | null = null;
+    if (entityId) {
+      const strategy = this.strategies[purpose];
+      updatedEntity = await strategy.sync(entityId, secure_url);
+    }
 
     // 3. Create a persistent StorageFile transaction log
     const isSensitive = purpose === StorageFilePurpose.CLAIM_DOCUMENT;

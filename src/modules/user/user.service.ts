@@ -14,6 +14,7 @@ import { AccountStatus } from '../../common/enums/account-status.enum';
 import { MemberRole } from '../../common/enums/member-role.enum';
 import { PinoLogger } from 'nestjs-pino';
 import { ClubStatus } from '../club/constants/club-status.enum';
+import { Club } from '../club/entities/club.entity';
 import { UserRepository } from './repositories/user.repository';
 import { FavoriteRepository } from './repositories/favorite.repository';
 import { UserSortField, SortOrder } from './dto/user-search.dto';
@@ -134,9 +135,21 @@ export class UserService {
     await queryRunner.startTransaction();
 
     try {
-      // update club membership so they leave the club upon soft delete
+      // If user is a lone owner of an active club, dissolve the club atomically
+      if (
+        user.member_role === MemberRole.OWNER &&
+        user.club &&
+        user.club?.owner_id === user.id &&
+        user.club?.status === ClubStatus.ACTIVE
+      ) {
+        const club = user.club;
+        club.status = ClubStatus.SOFT_DELETED;
+        await queryRunner.manager.save(Club, club);
+        await queryRunner.manager.softRemove(Club, club);
+      }
+
       user.club_id = null;
-      user.member_role = null;
+      user.member_role = MemberRole.NONE;
       user.last_security_action_at = updateSecurityActionTime();
 
       // We maintain the user row but change status and deleted_at
@@ -233,8 +246,8 @@ export class UserService {
    */
   async updateClubMembership(
     userId: string,
-    clubId: string | null,
-    role: MemberRole | null,
+    clubId: string | null = null,
+    role: MemberRole = MemberRole.NONE,
   ): Promise<void> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -247,16 +260,8 @@ export class UserService {
         throw new NotFoundException('User not found');
       }
 
-      user.club_id = clubId; // using any for nullable FK assign if stricter TS complains
+      user.club_id = clubId;
       user.member_role = role;
-
-      if (clubId === null) {
-        user.club_id = null;
-        user.member_role = null;
-      } else {
-        user.club_id = clubId;
-        user.member_role = role;
-      }
 
       await queryRunner.manager.save(user);
       await queryRunner.commitTransaction();
@@ -418,7 +423,7 @@ export class UserService {
         id: userId,
         status: Not(In([AccountStatus.SOFT_DELETED, AccountStatus.BANNED])),
       },
-      relations: ['club', 'club.users'],
+      relations: ['club'],
       select: {
         id: true,
         email: true,
@@ -434,10 +439,6 @@ export class UserService {
           id: true,
           owner_id: true,
           status: true,
-          users: {
-            id: true,
-            status: true,
-          },
         },
       },
     });
@@ -452,15 +453,12 @@ export class UserService {
       user.club?.owner_id === user.id &&
       user.club?.status === ClubStatus.ACTIVE
     ) {
-      const club = user.club;
+      const hasOtherMembers = await this.userRepository.hasOtherActiveMembers(
+        user.club_id!,
+        user.id,
+      );
 
-      // Ensure no other members exist, or we require them to be removed first
-      const otherStaff =
-        club.users?.filter(
-          (u) => u.id !== user.id && u.status !== AccountStatus.SOFT_DELETED,
-        ) ?? [];
-
-      if (otherStaff.length > 0) {
+      if (hasOtherMembers) {
         this.logger.error(
           `User ${userId} is an owner of an active club with other members`,
         );

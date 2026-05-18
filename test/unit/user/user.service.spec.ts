@@ -45,6 +45,7 @@ describe('UserService', () => {
     // Setup Mock User Repository
     userRepository = {
       findActiveById: jest.fn(),
+      hasOtherActiveMembers: jest.fn(),
       internalRepo: {
         findOne: jest.fn(),
         save: jest.fn(),
@@ -175,6 +176,7 @@ describe('UserService', () => {
       } as any;
 
       userRepository.internalRepo.findOne.mockResolvedValue(mockUser);
+      userRepository.hasOtherActiveMembers.mockResolvedValue(true);
 
       await expect(service.softDeleteAccount(userId)).rejects.toThrow(
         BadRequestException,
@@ -197,6 +199,7 @@ describe('UserService', () => {
       } as any;
 
       userRepository.internalRepo.findOne.mockResolvedValue(mockUser);
+      userRepository.hasOtherActiveMembers.mockResolvedValue(false);
 
       await service.softDeleteAccount(userId);
 
@@ -208,7 +211,7 @@ describe('UserService', () => {
 
       // Verify fields are updated and anonymized
       expect(mockUser.club_id).toBeNull();
-      expect(mockUser.member_role).toBeNull();
+      expect(mockUser.member_role).toBe(MemberRole.NONE);
       expect(mockUser.status).toBe(AccountStatus.SOFT_DELETED);
       expect(mockUser.original_email).toBe('original@example.com');
       expect(mockUser.original_username).toBe('original_user');

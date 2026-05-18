@@ -132,7 +132,7 @@ export class StorageService {
     } = body;
 
     // 1. Enforce business entity access controls
-    await this.validateEntityAccess(user, purpose, entityId);
+    if (entityId) await this.validateEntityAccess(user, purpose, entityId);
 
     // 1b. Enforce signature timeframe expiration (e.g. 5 minutes / 300 seconds)
     const parts = public_id.split('_');

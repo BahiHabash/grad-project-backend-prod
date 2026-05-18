@@ -11,13 +11,13 @@ import { StorageFilePurpose } from '../../common/enums/storage-file-purpose.enum
 import { StorageFileRepository } from './repositories/storage-file.repository';
 import { UserRepository } from '../user/repositories/user.repository';
 import { ClubRepository } from '../club/repositories/club.repository';
-import { ClaimRepository } from '../club/repositories/claim.repository';
+import { ClaimRepository } from '../club-claim/repositories/claim.repository';
 import { AccessTokenPayload } from '../auth/constants/token-payload.type';
 import { SystemRole } from '../../common/enums/system-role.enum';
 import { StorageFile } from './entities/storage-file.entity';
 import { User } from '../user/entities/user.entity';
 import { Club } from '../club/entities/club.entity';
-import { Claim } from '../club/entities/claim.entity';
+import { Claim } from '../club-claim/entities/claim.entity';
 import { CloudinaryConfig } from '../../core/config/configrations';
 import { getCloudinaryFolder } from '../../common/utils/storage.util';
 import { StorageSyncStrategy } from './interfaces/storage-sync-strategy.interface';

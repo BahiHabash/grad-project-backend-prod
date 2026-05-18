@@ -29,7 +29,7 @@ import type { AccessTokenPayload } from '../../auth/constants/token-payload.type
  */
 @ApiTags('Club Governance')
 @ApiBearerAuth()
-@Controller('api/v1/clubs')
+@Controller('clubs')
 export class ClubController {
   constructor(private readonly clubService: ClubService) {}
 

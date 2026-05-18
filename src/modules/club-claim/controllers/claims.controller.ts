@@ -31,7 +31,7 @@ import type { AccessTokenPayload } from '../../auth/constants/token-payload.type
  */
 @ApiTags('Claims')
 @ApiBearerAuth()
-@Controller('api/v1/claims')
+@Controller('claims')
 @MemberRoles(MemberRole.NONE)
 export class ClaimsController {
   constructor(private readonly clubClaimService: ClubClaimService) {}

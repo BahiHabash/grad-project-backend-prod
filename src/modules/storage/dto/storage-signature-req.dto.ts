@@ -1,5 +1,5 @@
-import { IsEnum, IsUUID } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsUUID, ValidateIf } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { StorageFilePurpose } from '../../../common/enums/storage-file-purpose.enum';
 
 /**
@@ -24,11 +24,12 @@ export class StorageSignatureReqDto {
    * The ID of the target entity (e.g. user_id for profiles, club_id for logos)
    * @example 'e2e604f2-95f3-4fb0-86c3-1ad394ea7d08'
    */
-  @ApiProperty({
+  @ApiPropertyOptional({
     description:
-      'The UUID of the target entity (e.g., User ID, Club ID, or Claim ID)',
+      'The UUID of the target entity (required except when purpose is CLAIM_DOCUMENT)',
     example: 'e2e604f2-95f3-4fb0-86c3-1ad394ea7d08',
   })
+  @ValidateIf((o: StorageSignatureReqDto) => o.purpose !== StorageFilePurpose.CLAIM_DOCUMENT)
   @IsUUID('4', { message: 'entityId must be a valid UUID v4' })
-  entityId: string;
+  entityId?: string;
 }

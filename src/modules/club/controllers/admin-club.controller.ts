@@ -30,7 +30,7 @@ import { ClubService } from '../club.service';
  */
 @ApiTags('Admin — Clubs')
 @ApiBearerAuth()
-@Controller('api/v1/admin/clubs')
+@Controller('admin/clubs')
 @SysRoles(SystemRole.ADMIN, SystemRole.SUPER_ADMIN)
 export class AdminClubController {
   constructor(private readonly clubService: ClubService) {}

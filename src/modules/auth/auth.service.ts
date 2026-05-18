@@ -632,7 +632,7 @@ export class AuthService {
     const api: string = this.appConfig.apiPrefix;
 
     // BUG should be the frontend url
-    // e.g: http://localhost:3000/api/v1/auth/verify-email?token=...
+    // e.g: http://localhost:3000/auth/verify-email?token=...
     const url: string = `${baseUrl}/${api}/${route}?token=${token}`;
 
     return url;

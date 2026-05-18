@@ -124,4 +124,25 @@ export class UserRepository extends BaseRepository<User> {
       select,
     });
   }
+
+  /**
+   * Checks if a club has other active (non-deleted, non-banned) members besides the specified user.
+   *
+   * @param clubId        - The ID of the club.
+   * @param excludeUserId - The ID of the user to exclude from the check.
+   * @returns             - Promise resolving to true if other active members exist, false otherwise.
+   */
+  async hasOtherActiveMembers(
+    clubId: string,
+    excludeUserId: string,
+  ): Promise<boolean> {
+    const count = await this.repo.count({
+      where: {
+        club_id: clubId,
+        id: Not(excludeUserId),
+        status: Not(In([AccountStatus.SOFT_DELETED, AccountStatus.BANNED])),
+      },
+    });
+    return count > 0;
+  }
 }

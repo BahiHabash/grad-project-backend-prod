@@ -7,6 +7,7 @@ import * as crypto from 'crypto';
 import { StorageSignatureReqDto } from './dto/storage-signature-req.dto';
 import { StorageSignatureResDto } from './dto/storage-signature-res.dto';
 import { StorageConfirmReqDto } from './dto/storage-confirm-req.dto';
+import { StorageConfirmResDto } from './dto/storage-confirm-res.dto';
 import { StorageFilePurpose } from '../../common/enums/storage-file-purpose.enum';
 import { StorageFileRepository } from './repositories/storage-file.repository';
 import { UserRepository } from '../user/repositories/user.repository';
@@ -116,7 +117,7 @@ export class StorageService {
   async confirmUpload(
     user: AccessTokenPayload,
     body: StorageConfirmReqDto,
-  ): Promise<{ file: StorageFile; entity: User | Club | Claim | null }> {
+  ): Promise<StorageConfirmResDto> {
     const {
       purpose,
       entityId,

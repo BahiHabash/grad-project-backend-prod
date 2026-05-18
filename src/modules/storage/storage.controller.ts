@@ -11,6 +11,7 @@ import { StorageService } from './storage.service';
 import { StorageSignatureReqDto } from './dto/storage-signature-req.dto';
 import { StorageSignatureResDto } from './dto/storage-signature-res.dto';
 import { StorageConfirmReqDto } from './dto/storage-confirm-req.dto';
+import { StorageConfirmResDto } from './dto/storage-confirm-res.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AccessTokenPayload } from '../auth/constants/token-payload.type';
 import { ValidationGuard } from '../../common/guards/validation.guard';
@@ -74,6 +75,7 @@ export class StorageController {
   })
   @ApiOkResponse({
     description: 'Database updated and upload successfully confirmed.',
+    type: StorageConfirmResDto,
   })
   @ApiBadRequestResponse({
     description: 'Invalid input parameters or failed validation.',
@@ -85,7 +87,7 @@ export class StorageController {
   async confirmUpload(
     @CurrentUser() user: AccessTokenPayload,
     @Body() body: StorageConfirmReqDto,
-  ): Promise<{ success: boolean; message: string; data: unknown }> {
+  ): Promise<StorageConfirmResDto> {
     return this.storageService.confirmUpload(user, body);
   }
 }

@@ -4,6 +4,7 @@ import { CoreModule } from './core/core.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ClubModule } from './modules/club/club.module';
+import { ClubClaimModule } from './modules/club-claim/club-claim.module';
 import { InvitationModule } from './modules/invitation/invitation.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -28,6 +29,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     UserModule,
     AuthModule,
     ClubModule,
+    ClubClaimModule,
     InvitationModule,
     AdminModule,
     PrematchModule,

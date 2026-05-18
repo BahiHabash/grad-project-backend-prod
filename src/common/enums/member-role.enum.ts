@@ -4,4 +4,5 @@
 export enum MemberRole {
   OWNER = 'OWNER', // can do everything
   STAFF = 'STAFF', // can do everything except deleting other members
+  NONE = 'NONE', // can do nothing
 }

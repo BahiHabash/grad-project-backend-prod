@@ -68,7 +68,7 @@ export class StorageService {
     const { purpose, entityId } = query;
 
     // 1. Enforce business entity access controls
-    await this.validateEntityAccess(user, purpose, entityId);
+    if (entityId) await this.validateEntityAccess(user, purpose, entityId);
 
     // 2. Resolve Cloudinary credentials from configuration class
     const { apiKey, apiSecret, cloudName, overWrite } = this.cloudinaryConfig;
@@ -79,7 +79,7 @@ export class StorageService {
     // 4. Generate a semantic public_id using entity ID, purpose, and timestamp
     const timestamp = Math.round(Date.now() / 1000);
     const purposeSnake = purpose.toLowerCase().replace(/_/g, '_');
-    const publicId = `${entityId}_${purposeSnake}_${timestamp}`;
+    const publicId = `${entityId || 'temp'}_${purposeSnake}_${timestamp}`;
 
     // 5. Build parameter set to sign alphabetically
     const paramsToSign = {

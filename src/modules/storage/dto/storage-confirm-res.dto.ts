@@ -20,7 +20,8 @@ export class StorageConfirmResDto {
    * The updated database entity (User, Club, or Claim) or null if no sync was performed
    */
   @ApiPropertyOptional({
-    description: 'The updated database entity (User, Club, or Claim) or null if no sync was performed',
+    description:
+      'The updated database entity (User, Club, or Claim) or null if no sync was performed',
   })
   entity: User | Club | Claim | null;
 }

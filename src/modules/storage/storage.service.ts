@@ -15,7 +15,6 @@ import { ClubRepository } from '../club/repositories/club.repository';
 import { ClaimRepository } from '../club-claim/repositories/claim.repository';
 import { AccessTokenPayload } from '../auth/constants/token-payload.type';
 import { SystemRole } from '../../common/enums/system-role.enum';
-import { StorageFile } from './entities/storage-file.entity';
 import { User } from '../user/entities/user.entity';
 import { Club } from '../club/entities/club.entity';
 import { Claim } from '../club-claim/entities/claim.entity';

@@ -197,11 +197,7 @@ describe('StorageService', () => {
 
       const result = await service.confirmUpload(user, body);
 
-      expect(result.success).toBe(true);
-      expect(result.message).toBe(
-        'Upload confirmed and synchronized successfully.',
-      );
-      expect((result.data.entity as User).profile_image_url).toBe(
+      expect((result.entity as User).profile_image_url).toBe(
         'https://cloudinary.com/image.jpg',
       );
       expect(userRepositoryMock.internalRepo.save).toHaveBeenCalled();
@@ -234,8 +230,7 @@ describe('StorageService', () => {
 
       const result = await service.confirmUpload(user, body);
 
-      expect(result.success).toBe(true);
-      expect((result.data.entity as Club).logo_url).toBe(
+      expect((result.entity as Club).logo_url).toBe(
         'https://cloudinary.com/logo.jpg',
       );
       expect(clubRepositoryMock.internalRepo.save).toHaveBeenCalled();
@@ -261,8 +256,7 @@ describe('StorageService', () => {
 
       const result = await service.confirmUpload(user, body);
 
-      expect(result.success).toBe(true);
-      expect((result.data.entity as Claim).document_urls).toContain(
+      expect((result.entity as Claim).document_urls).toContain(
         'https://cloudinary.com/doc.pdf',
       );
       expect(claimRepositoryMock.internalRepo.save).toHaveBeenCalled();
@@ -287,8 +281,7 @@ describe('StorageService', () => {
 
       const result = await service.confirmUpload(user, body);
 
-      expect(result.success).toBe(true);
-      expect(result.data.entity).toBeNull();
+      expect(result.entity).toBeNull();
       expect(storageFileRepositoryMock.save).toHaveBeenCalledWith(
         expect.objectContaining({
           purpose: StorageFilePurpose.CLAIM_DOCUMENT,

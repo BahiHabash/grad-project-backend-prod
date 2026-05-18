@@ -116,11 +116,7 @@ export class StorageService {
   async confirmUpload(
     user: AccessTokenPayload,
     body: StorageConfirmReqDto,
-  ): Promise<{
-    success: boolean;
-    message: string;
-    data: { file: StorageFile; entity: User | Club | Claim | null };
-  }> {
+  ): Promise<{ file: StorageFile; entity: User | Club | Claim | null }> {
     const {
       purpose,
       entityId,
@@ -183,12 +179,8 @@ export class StorageService {
     const savedFile = await this.storageFileRepository.save(storageFile);
 
     return {
-      success: true,
-      message: 'Upload confirmed and synchronized successfully.',
-      data: {
-        file: savedFile,
-        entity: updatedEntity,
-      },
+      file: savedFile,
+      entity: updatedEntity,
     };
   }
 

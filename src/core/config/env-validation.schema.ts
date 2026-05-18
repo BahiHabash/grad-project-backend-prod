@@ -48,4 +48,14 @@ export const envValidationSchema = Joi.object({
   GEMINI_MODEL: Joi.string().optional().default('gemini-2.0-flash'),
   GROQ_API_KEY: Joi.string().optional(),
   GROQ_MODEL: Joi.string().optional().default('llama-3.1-8b-instant'),
+
+  // --- Cloudinary ---
+  CLOUDINARY_URL: Joi.string()
+    .required()
+    .pattern(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/)
+    .messages({
+      'string.pattern.base':
+        'CLOUDINARY_URL must follow the format: cloudinary://api_key:api_secret@cloud_name',
+    }),
+  CLOUDINARY_OVERWRITE: Joi.string().valid('true', 'false').default('false'),
 });

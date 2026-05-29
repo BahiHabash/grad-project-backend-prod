@@ -216,9 +216,7 @@ export class UserService {
     id: string,
     requester?: AccessTokenPayload,
   ): Promise<UserPublicProfileResDto> {
-    const targetUser = await this.userRepository.findActiveById(id, {
-      club: true,
-    });
+    const targetUser = await this.userRepository.findActiveById(id);
 
     if (!targetUser) {
       throw new NotFoundException(`Invalid user ID: ${id}`);
